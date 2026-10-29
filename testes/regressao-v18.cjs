@@ -14,7 +14,7 @@ function harness(){
   for(const mode of ['success','denied','race','insufficient']){
     const h=harness();Object.assign(h.fields,{'mov-material':{value:'test'},'mov-tipo':{value:'saida'},'mov-qtd':{value:mode==='insufficient'?'2':'1'}});
     h.ctx.sbSelect=async()=>[{id:'stock',quantidade_disponivel:1,quantidade_contratada:1}];
-    h.ctx.sbUpdate=async(table,filter,row)=>{assert(filter.includes('quantidade_disponivel=eq.1'));assert.equal(row.quantidade_disponivel,0);if(mode==='denied')throw Error('Sem permissão');return mode==='race'?[]:[{id:'stock'}];};
+    h.ctx.sbFetch=async(filter,method,row)=>{assert(filter.includes('quantidade_disponivel=eq.1'));assert.equal(row.quantidade_disponivel,0);if(mode==='denied')throw Error('Sem permissão');return mode==='race'?[]:[{id:'stock'}];};
     vm.runInContext(mov,h.ctx);await h.ctx.salvarMovimentacao();
     assert.equal(h.ctx.DB.materiais[0].disp,mode==='success'?0:1,mode);assert.equal(h.stats().writes,mode==='success'?1:0);assert.equal(h.fields.btn.disabled,false);
   }
