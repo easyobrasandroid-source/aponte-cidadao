@@ -1,4 +1,4 @@
-name: V18 - Smoke test publico (sem alterar dados)
+name: V18 - Testes visuais sem modificar o banco
 on:
   push:
     branches: [homologacao-v18]
@@ -12,19 +12,36 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar navegador para testes
+      - name: Instalar Playwright/Chromium
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
-      - name: Iniciar a interface local
+      - name: Servir HTML da homologação
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/aponte-http.log 2>&1 &
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/aponte.log 2>&1 &
           sleep 2
-      - name: Testar interface publica
+          curl --fail --silent --show-error http://127.0.0.1:8765/ >/dev/null
+      - name: Testar frontend homologação
+        env:
+          APP_URL: http://127.0.0.1:8765/
+          TEST_LABEL: homologacao
         run: node testes/smoke-publico.js
+      - name: Testar site publicado
+        env:
+          APP_URL: https://easyobrasandroid-source.github.io/aponte-cidadao/teste-v18/
+          TEST_LABEL: publicado
+        run: node testes/smoke-publico.js
+      - name: Guardar vídeo, imagens e relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aponte-v18-evidencias-visuais
+          path: testes/evidencias/
+          if-no-files-found: warn
+          retention-days: 14
