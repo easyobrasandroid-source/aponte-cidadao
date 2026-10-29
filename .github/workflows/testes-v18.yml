@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Regressão de criação e estoque (sem rede)
+        run: node testes/regressao-v18.cjs index.html
       - name: Instalar Playwright/Chromium
         run: |
           npm install --no-save playwright
