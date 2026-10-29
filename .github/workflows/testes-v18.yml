@@ -1,0 +1,30 @@
+name: V18 - Smoke test publico (sem alterar dados)
+on:
+  push:
+    branches: [homologacao-v18]
+    paths:
+      - 'index.html'
+      - 'testes/**'
+      - '.github/workflows/testes-v18.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar navegador para testes
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Iniciar a interface local
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/aponte-http.log 2>&1 &
+          sleep 2
+      - name: Testar interface publica
+        run: node testes/smoke-publico.js
