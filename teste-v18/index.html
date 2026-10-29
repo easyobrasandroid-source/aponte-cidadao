@@ -2527,7 +2527,7 @@ async function salvarMovimentacao(){
     const novoSaldo=saldo+(tipo==='entrada'?qtd:-qtd);
     const novoCont=cont+(tipo==='entrada'?qtd:0);
     // Compare-and-set: reject concurrent edits instead of overwriting another movement.
-    const updated=await sbUpdate('estoques','id=eq.'+encodeURIComponent(est.id)+'&quantidade_disponivel=eq.'+saldo+'&quantidade_contratada=eq.'+cont,{
+    const updated=await sbFetch('estoques?id=eq.'+encodeURIComponent(est.id)+'&quantidade_disponivel=eq.'+saldo+'&quantidade_contratada=eq.'+cont,'PATCH',{
       quantidade_disponivel:novoSaldo,quantidade_contratada:novoCont,updated_at:new Date().toISOString()
     });
     if(!Array.isArray(updated)||updated.length!==1)throw new Error('Movimentação não confirmada. Saldo alterado ou acesso negado; atualize a página.');
