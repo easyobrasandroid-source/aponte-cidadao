@@ -745,7 +745,7 @@ async function sbSaveMaterial(mat){
       estoque_minimo: mat.min||0, preco_unitario: mat.preco||0,
       status: 'ativo',
     };
-    let materialId = mat._supaId;
+    let materialId = mat._supaId || (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(mat.id||'') ? mat.id : null);
     if(materialId){
       // Já existe → UPDATE
       await sbUpdate('materiais', 'id=eq.'+materialId, matRow);
@@ -2295,31 +2295,10 @@ function renderEstoqueGrid(){
 
 function vEstoque(b,t,a){
   t.textContent='Controle de estoque';
-  // Sincronizar materiais com o banco ao abrir
-  sbGetMateriais().then(async mats=>{
-    if(mats && mats.length){
-      DB.materiais = mats;
-      saveDB(DB);
-      if(typeof renderEstoqueGrid==='function') renderEstoqueGrid();
-      console.log('[Estoque] ✅', mats.length, 'materiais do banco');
-    } else {
-      // Banco vazio → migrar o seed local para o Supabase (uma vez)
-      console.log('[Estoque] banco vazio, migrando seed para o banco...');
-      const seed = getMats();
-      showToast('🔄 Cadastrando materiais no banco pela primeira vez...','ok');
-      for(const m of seed){
-        const supaId = await sbSaveMaterial({n:m.n, u:m.u, min:m.min, preco:m.preco, cont:m.cont, disp:m.disp});
-      }
-      // Recarregar do banco (agora com UUIDs)
-      const mats2 = await sbGetMateriais();
-      if(mats2 && mats2.length){
-        DB.materiais = mats2;
-        saveDB(DB);
-        if(typeof renderEstoqueGrid==='function') renderEstoqueGrid();
-        showToast('✅ '+mats2.length+' materiais cadastrados no banco!','ok');
-        console.log('[Estoque] ✅ migração concluída:', mats2.length);
-      }
-    }
+  sbGetMateriais().then(mats=>{
+    if(!Array.isArray(mats)){showToast('Não foi possível atualizar o estoque.','erro');return;}
+    DB.materiais=mats;saveDB(DB);
+    if(document.getElementById('stk-grid-body')) renderEstoqueGrid();
   });
   a.innerHTML=`
     <button class="btn btn-ghost" onclick="abrirHistoricoMovimentacao()">📋 Histórico</button>
@@ -2419,7 +2398,7 @@ function fecharModalMaterial(){
 }
 function editarMaterial(id){ abrirModalMaterial(id); }
 
-function salvarMaterial(){
+async function salvarMaterial(){
   const nome=document.getElementById('mat-nome')?.value?.trim();
   const u=document.getElementById('mat-unidade')?.value;
   const cont=parseInt(document.getElementById('mat-cont')?.value||'0');
@@ -2440,34 +2419,28 @@ function salvarMaterial(){
     if(fb){fb.style.display='block';fb.style.background='#FEE2E2';fb.style.color='#B91C1C';fb.textContent='⚠ Quantidade disponível não pode ser maior que a contratada.';}
     return;
   }
-  // Salvar
   const btn=document.getElementById('mat-salvar-btn');
-  if(btn){btn.textContent='💾 Salvando...';btn.disabled=true;}
-  setTimeout(()=>{
-    if(!DB.materiais) getMats();
-    let matObj;
-    if(_matEditId){
-      const idx=DB.materiais.findIndex(x=>x.id===_matEditId);
-      if(idx>=0){ DB.materiais[idx]={...DB.materiais[idx],n:nome,u,cont,disp,min:min||0,preco:preco||0}; matObj=DB.materiais[idx]; }
-    } else {
-      const newId='m'+Date.now();
-      matObj={id:newId,n:nome,u,cont,disp,min:min||0,preco:preco||0};
-      DB.materiais.push(matObj);
+  if(btn?.disabled)return;
+  if([cont,disp,min,preco].some(n=>!Number.isFinite(n)||n<0)){
+    showToast('Informe quantidades e preço válidos, sem valores negativos.','erro');return;
+  }
+  const anterior=_matEditId?getMats().find(m=>m.id===_matEditId):null;
+  const matObj={...anterior,n:nome,u,cont,disp,min,preco};
+  if(btn){btn.disabled=true;btn.textContent='💾 Salvando...';}
+  try{
+    const id=await sbSaveMaterial(matObj);
+    if(!id){
+      if(fb){fb.style.display='block';fb.style.background='#FEE2E2';fb.style.color='#B91C1C';fb.textContent='O banco não confirmou o cadastro. Atualize o estoque antes de tentar novamente.';}
+      return;
     }
-    saveDB(DB);
-    // Gravar no Supabase
-    if(matObj){
-      sbSaveMaterial(matObj).then(supaId=>{
-        if(supaId){ matObj._supaId=supaId; saveDB(DB); console.log('[Estoque] ✅ material no banco'); }
-        else showToast('⚠ Material salvo local. Erro no banco.','aviso');
-      });
-    }
-    if(fb){fb.style.display='block';fb.style.background='#D1FAE5';fb.style.color='#065F46';fb.textContent='✅ Material salvo com sucesso!';}
-    if(btn){btn.textContent='💾 Salvar material';btn.disabled=false;}
-    renderEstoqueGrid();
-    setTimeout(()=>fecharModalMaterial(),1200);
-  },400);
+    matObj.id=id;matObj._supaId=id;
+    const idx=getMats().findIndex(m=>m.id===_matEditId);
+    if(idx>=0)DB.materiais[idx]=matObj;else DB.materiais.push(matObj);
+    saveDB(DB);renderEstoqueGrid();fecharModalMaterial();
+    showToast('✅ Material confirmado no banco.','ok');
+  }finally{if(btn){btn.disabled=false;btn.textContent='💾 Salvar material';}}
 }
+
 
 async function abrirHistoricoMovimentacao(){
   showToast('🔄 Carregando movimentações...','ok');
@@ -2522,7 +2495,9 @@ async function abrirHistoricoMovimentacao(){
 function abrirMovimentacao(matId){
   const overlay=document.getElementById('modal-mov-overlay');
   if(!overlay){vEstoque(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));return;}
-  if(matId) document.getElementById('mov-material').value=matId;
+  const select=document.getElementById('mov-material');
+  select.innerHTML=getMats().map(m=>'<option value="'+escaparCidadeHTML(m.id)+'">'+escaparCidadeHTML(m.n)+' ('+Number(m.disp)+' disponíveis)</option>').join('');
+  if(matId)select.value=matId;
   document.getElementById('mov-qtd').value='';
   document.getElementById('mov-obs').value='';
   overlay.style.display='flex';
@@ -2533,30 +2508,35 @@ function fecharModalMov(){
   if(overlay) overlay.style.display='none';
   document.body.style.overflow='';
 }
-function salvarMovimentacao(){
+async function salvarMovimentacao(){
+  const btn=document.querySelector('button[onclick="salvarMovimentacao()"]');
+  if(btn?.disabled)return;
   const matId=document.getElementById('mov-material')?.value;
   const tipo=document.getElementById('mov-tipo')?.value;
-  const qtd=parseInt(document.getElementById('mov-qtd')?.value||'0');
-  if(!qtd||qtd<1){alert('Informe a quantidade.');return;}
-  if(!DB.materiais) getMats();
-  const m=DB.materiais.find(x=>x.id===matId);
-  if(!m){alert('Material não encontrado.');return;}
-  if(tipo==='saida'){
-    if(qtd>m.disp){alert(`Estoque insuficiente. Disponível: ${m.disp} ${m.u}.`);return;}
-    m.disp-=qtd;
-  } else {
-    m.disp+=qtd;m.cont+=qtd;
+  const qtd=Number(document.getElementById('mov-qtd')?.value);
+  if(!Number.isInteger(qtd)||qtd<1||!['saida','entrada'].includes(tipo)){
+    showToast('Informe uma quantidade inteira positiva.','erro');return;
   }
-  saveDB(DB);
-  fecharModalMov();
-  renderEstoqueGrid();
-  // Toast de sucesso
-  const toast=document.createElement('div');
-  toast.textContent=`✅ ${tipo==='saida'?'Saída':'Entrada'} de ${qtd} ${m.u} registrada — ${m.n}`;
-  toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1F2937;color:#fff;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:opacity .2s;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-  document.body.appendChild(toast);
-  setTimeout(()=>toast.style.opacity='1',10);
-  setTimeout(()=>{toast.style.opacity='0';setTimeout(()=>toast.remove(),300);},3000);
+  if(btn){btn.disabled=true;btn.textContent='Registrando…';}
+  try{
+    const rows=await sbSelect('estoques','material_id=eq.'+encodeURIComponent(matId));
+    if(rows?.length!==1)throw new Error('Estoque não encontrado ou ambíguo. Atualize a página.');
+    const est=rows[0],saldo=Number(est.quantidade_disponivel),cont=Number(est.quantidade_contratada);
+    if(!Number.isFinite(saldo)||!Number.isFinite(cont))throw new Error('Saldo inválido no banco.');
+    if(tipo==='saida'&&qtd>saldo)throw new Error('Estoque insuficiente. Disponível: '+saldo+'.');
+    const novoSaldo=saldo+(tipo==='entrada'?qtd:-qtd);
+    const novoCont=cont+(tipo==='entrada'?qtd:0);
+    // Compare-and-set: reject concurrent edits instead of overwriting another movement.
+    const updated=await sbUpdate('estoques','id=eq.'+encodeURIComponent(est.id)+'&quantidade_disponivel=eq.'+saldo+'&quantidade_contratada=eq.'+cont,{
+      quantidade_disponivel:novoSaldo,quantidade_contratada:novoCont,updated_at:new Date().toISOString()
+    });
+    if(!Array.isArray(updated)||updated.length!==1)throw new Error('Movimentação não confirmada. Saldo alterado ou acesso negado; atualize a página.');
+    const m=getMats().find(m=>m.id===matId);
+    if(m){m.disp=novoSaldo;m.cont=novoCont;}
+    saveDB(DB);renderEstoqueGrid();fecharModalMov();
+    showToast('✅ Movimentação confirmada no banco.','ok');
+  }catch(e){showToast(escaparCidadeHTML(e.message||'Falha ao registrar movimentação.'),'erro');}
+  finally{if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
 }
 
 // ═══ RELATÓRIOS ═══
@@ -4493,9 +4473,9 @@ async function salvarChamadoInterno(){
     lat=window._gpsLat;lng=window._gpsLng;loc_src='gps_mobile';
   }
   // Não fabricar coordenadas próximas do centro da cidade quando o endereço não foi localizado.
-  if(lat===null&&end){
+  if(lat===null&&endereco){
     try{
-      const pedacos=end.split(',');
+      const pedacos=endereco.split(',');
       const geo=await tentarGeocodar({rua:pedacos[0],numero:pedacos[1]?.trim()||'',bairro,cidade:city.nome},'geocode-status-int');
       if(geo&&Number.isFinite(geo.lat)&&Number.isFinite(geo.lng)&&geo.confianca!=='cidade_aproximada'){
         lat=geo.lat;lng=geo.lng;loc_src='address_geocoding';
