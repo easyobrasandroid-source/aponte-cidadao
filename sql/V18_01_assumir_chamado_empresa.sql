@@ -21,11 +21,15 @@ CREATE POLICY pol_chamados_claim_empresa ON public.chamados
     AND empresa_id IS NULL
     AND status IN ('Recebido','Em programação')
     AND public.empresa_atende(cidade_id)
+    AND EXISTS (SELECT 1 FROM public.empresas e
+                 WHERE e.id=public.minha_empresa() AND e.status='ativo')
   )
   WITH CHECK (
     public.meu_perfil()='empresa'
     AND empresa_id=public.minha_empresa()
     AND public.empresa_atende(cidade_id)
+    AND EXISTS (SELECT 1 FROM public.empresas e
+                 WHERE e.id=public.minha_empresa() AND e.status='ativo')
   );
 
 -- Insere uma exceção estrita no guard de UPDATE já existente.
@@ -41,6 +45,8 @@ DECLARE
        AND NEW.empresa_id IS NOT DISTINCT FROM public.minha_empresa()
        AND OLD.status IN ('Recebido','Em programação')
        AND public.empresa_atende(OLD.cidade_id)
+       AND EXISTS (SELECT 1 FROM public.empresas e
+                    WHERE e.id=NEW.empresa_id AND e.status='ativo')
        AND (to_jsonb(NEW) - ARRAY['empresa_id','empresa','updated_at']::text[])
            IS NOT DISTINCT FROM
            (to_jsonb(OLD) - ARRAY['empresa_id','empresa','updated_at']::text[])
@@ -76,6 +82,7 @@ DECLARE
   v_empresa_status text;
   v_id uuid;
   v_protocolo text;
+  v_status text;
 BEGIN
   SELECT u.empresa_id, u.nome INTO v_empresa_id, v_nome
     FROM public.usuarios u
@@ -100,7 +107,7 @@ BEGIN
      AND c.status IN ('Recebido','Em programação')
      AND public.empresa_atende(c.cidade_id)
      AND c.consorcio_id=(SELECT e.consorcio_id FROM public.empresas e WHERE e.id=v_empresa_id)
-   RETURNING c.id,c.protocolo INTO v_id,v_protocolo;
+   RETURNING c.id,c.protocolo,c.status INTO v_id,v_protocolo,v_status;
 
   IF v_id IS NULL THEN
     RAISE EXCEPTION 'CHAMADO_INDISPONIVEL_OU_SEM_PERMISSAO' USING ERRCODE='P0001';
@@ -109,7 +116,7 @@ BEGIN
   INSERT INTO public.chamado_historico
     (chamado_id,status,mensagem,observacao,usuario_nome,cor)
   VALUES
-    (v_id,'Recebido','Chamado assumido por empresa executora',
+    (v_id,v_status,'Chamado assumido por empresa executora',
      'Atribuição confirmada em operação atômica.',COALESCE(v_nome,'Empresa'),'#0D7A55');
 
   RETURN jsonb_build_object(
