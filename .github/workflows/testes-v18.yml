@@ -20,6 +20,8 @@ jobs:
           node-version: '22'
       - name: Regressão de criação e estoque (sem rede)
         run: node testes/regressao-v18.cjs index.html
+      - name: Validar contrato de assunção de chamados
+        run: node testes/teste-contrato-assuncao.js
       - name: Instalar Playwright/Chromium
         run: |
           npm install --no-save playwright
