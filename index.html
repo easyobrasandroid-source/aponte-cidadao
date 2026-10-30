@@ -412,7 +412,8 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="card-title">Andamento — clique para alterar status</div>
         <div class="ss-wrap" id="dw-steps"></div>
         <div style="background:var(--amber-light);border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:.5rem .75rem;font-size:11px;color:var(--amber)" id="dw-step-note"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-top:.75rem">
+        <div id="dw-assumir-chamado" style="margin-top:10px"></div>
+        <div id="dw-acoes-concluir" style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-top:.75rem">
           <span style="font-size:12px;color:var(--green);font-weight:500">Execução finalizada? <strong>Marque como concluído</strong></span>
           <div style="display:flex;gap:7px;flex-shrink:0">
             <button class="btn" style="background:#FFF8DC;color:#B8860B;border:1.5px solid #DAA520;font-size:12px;font-weight:700;padding:6px 13px;display:inline-flex;align-items:center;gap:5px" id="dw-acao-garantia" onclick="abrirModalGarantia()" title="Módulo LED com defeito coberto por garantia">⚡ Garantia LED</button>
@@ -1525,6 +1526,11 @@ function vChamados(b,t,a){
 // Permissões efetivas do guard_chamados() no Supabase V18.
 // A Prefeitura pode abrir e consultar chamados, mas não alterar status.
 // A empresa só atualiza a execução de chamados atribuídos a ela.
+// Fluxo V18: só o Supabase decide autorização e exclusividade da assunção.
+function podeAssumirChamado(c){
+  return !!CU && CU.perfil==='empresa' && !!CU.empresa_id && !!c && !c.empresa_id
+    && ['Recebido','Em programação'].includes(c.status) && !!c._supaId;
+}
 function podeMudarStatus(c){
   if(!CU || !c) return false;
   if(CU.perfil==='master') return true;
@@ -1552,6 +1558,18 @@ function abrirDrawer(id){
     </div>${i<4?`<div class="ss-line ${i<ci?'done':''}"></div>`:''}`).join('');
   document.getElementById('dw-step-note').textContent=`${c.status} — ${c.empresa||'Sem empresa'} · ${c.cidade}` +
     (podeMudar ? '' : ' · Somente leitura: mudança de status pelo gestor ou empresa responsável');
+  const canClaim=podeAssumirChamado(c);
+  const claimArea=document.getElementById('dw-assumir-chamado');
+  if(claimArea) claimArea.innerHTML=canClaim
+    ? `<button class="btn btn-save" id="dw-btn-assumir" onclick="assumirChamado('${id}')" style="width:100%;font-size:13px;padding:12px">🤝 Assumir este chamado para minha empresa</button>
+       <div style="font-size:11px;color:var(--gray-500);margin-top:5px">Após confirmar no banco, sua empresa poderá programar, executar, lançar materiais e concluir.</div>`
+    : '';
+  if(canClaim){
+    document.getElementById('dw-step-note').textContent=
+      `${c.status} — Disponível para assumir · ${c.cidade}. Programação e execução serão liberadas após a atribuição.`;
+  }
+  const areaConcluir=document.getElementById('dw-acoes-concluir');
+  if(areaConcluir) areaConcluir.style.display=podeMudar?'flex':'none';
   const btnConcluir=document.getElementById('dw-acao-concluir');
   if(btnConcluir) btnConcluir.style.display=podeMudar?'':'none';
   const btnGarantia=document.getElementById('dw-acao-garantia');
@@ -1872,6 +1890,51 @@ function refreshChamadosView(){
 }
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('drawerOverlay').classList.remove('open');document.body.style.overflow='';}
 function showDTab(id,el){document.querySelectorAll('.dw-tc').forEach(t=>t.classList.remove('on'));document.querySelectorAll('.dtab').forEach(t=>t.classList.remove('on'));document.getElementById('dw-tc-'+id).classList.add('on');if(el)el.classList.add('on');if(id==='materiais'&&typeof renderMateriaisChamado==='function')renderMateriaisChamado();}
+
+// Atribuição via RPC: chamada atômica e confirmação via nova leitura do Supabase.
+let _assumindoChamado=false;
+async function assumirChamado(id){
+  const chamado=DB.chamados.find(c=>c.id===id);
+  if(!podeAssumirChamado(chamado)){
+    showToast('Este chamado não está disponível para sua empresa.','erro');return;
+  }
+  if(_assumindoChamado)return;
+  if(!confirm('Confirma assumir o chamado '+chamado.protocolo+' pela sua empresa?'))return;
+  _assumindoChamado=true;
+  const botao=document.getElementById('dw-btn-assumir');
+  if(botao){botao.disabled=true;botao.textContent='Confirmando no banco…';}
+  try{
+    const resposta=await sbFetch('rpc/assumir_chamado_empresa','POST',{p_chamado_id:chamado._supaId});
+    if(!resposta || resposta.ok!==true || resposta.empresa_id!==CU.empresa_id){
+      throw new Error('O banco não confirmou a atribuição.');
+    }
+    const atualizado=await carregarChamadosDoBanco();
+    const persistido=atualizado ? DB.chamados.find(c=>c._supaId===chamado._supaId) : null;
+    if(!persistido || persistido.empresa_id!==CU.empresa_id){
+      throw new Error('A atribuição pode ter sido realizada, mas a leitura não confirmou o vínculo.');
+    }
+    refreshChamadosView();
+    abrirDrawer(persistido.id);
+    showToast('✅ Chamado assumido e confirmado no banco. Sua empresa já pode programar e executar.','ok');
+  }catch(e){
+    console.error('[Assumir chamado]',e);
+    const txt=(e.corpo||e.message||'');
+    let msg='Não foi possível assumir este chamado.';
+    if(/CHAMADO_INDISPONIVEL/.test(txt))
+      msg='Chamado já assumido, indisponível ou fora das cidades atendidas. Atualize a lista.';
+    else if(/SEM_PERMISSAO|EMPRESA_INATIVA/.test(txt))
+      msg='Sua empresa não tem permissão para assumir este chamado.';
+    else if(/Could not find the function|PGRST202|404/.test(txt))
+      msg='A função de assunção ainda não foi instalada no Supabase. Nenhum chamado foi alterado.';
+    else if(/pode ter sido realizada/.test(txt))
+      msg='Atribuição possivelmente realizada. Atualize a página antes de tentar novamente.';
+    showToast('❌ '+msg,'erro');
+  }finally{
+    _assumindoChamado=false;
+    const atual=document.getElementById('dw-btn-assumir');
+    if(atual){atual.disabled=false;atual.textContent='🤝 Assumir este chamado para minha empresa';}
+  }
+}
 
 // ═══ STATUS ═══
 const s2s=['Recebido','Em programação','Em execução','Aguard. material','Concluído'];
