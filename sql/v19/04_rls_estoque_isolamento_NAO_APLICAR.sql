@@ -69,6 +69,37 @@ CREATE POLICY pol_equipes_sel ON public.equipes FOR SELECT TO authenticated USIN
   OR (public.meu_perfil()='empresa' AND empresa_id=public.minha_empresa())
 );
 
+-- Usuários: uma executora não consulta usuários de outra empresa.
+DROP POLICY IF EXISTS pol_usuarios_sel ON public.usuarios;
+CREATE POLICY pol_usuarios_sel ON public.usuarios FOR SELECT TO authenticated USING (
+  public.is_master()
+  OR (public.meu_perfil()='consorcio' AND consorcio_id=public.meu_consorcio())
+  OR (public.meu_perfil()='prefeitura' AND cidade_id=public.minha_cidade())
+  OR (public.meu_perfil()='empresa' AND empresa_id=public.minha_empresa())
+  OR (public.meu_perfil()='garantia' AND auth_user_id=auth.uid())
+);
+
+-- Movimentos do estoque central: empresa lê somente os seus consumos,
+-- não vê nomes, datas e materiais lançados em chamados de concorrentes.
+DROP POLICY IF EXISTS pol_mov_sel ON public.movimentacoes;
+CREATE POLICY pol_mov_sel ON public.movimentacoes FOR SELECT TO authenticated USING (
+  public.is_master()
+  OR (public.meu_perfil()='consorcio' AND consorcio_id=public.meu_consorcio())
+  OR (public.meu_perfil()='empresa' AND EXISTS(
+    SELECT 1 FROM public.chamados c
+    WHERE c.id=movimentacoes.chamado_id
+      AND c.empresa_id=public.minha_empresa()
+      AND c.consorcio_id=movimentacoes.consorcio_id
+  ))
+);
+
+-- Auditoria global contém dados transversais. Não compartilhar com Empresa.
+DROP POLICY IF EXISTS pol_aud_sel ON public.auditoria;
+CREATE POLICY pol_aud_sel ON public.auditoria FOR SELECT TO authenticated USING (
+  public.is_master() OR
+  (public.meu_perfil()='consorcio' AND consorcio_id=public.meu_consorcio())
+);
+
 -- Histórico, materiais de chamados e fotos: acesso sempre subordinado ao chamado.
 DROP POLICY IF EXISTS pol_hist_sel ON public.chamado_historico;
 CREATE POLICY pol_hist_sel ON public.chamado_historico FOR SELECT TO authenticated USING (
