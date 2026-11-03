@@ -863,7 +863,7 @@ function montarLinhaChamado(c){
 const CAMPOS_EDICAO_CHAMADO={
   prefeitura:['bairro','endereco','referencia','area','latitude','longitude','loc_src','tipo','qtd','observacoes','solicitante_nome','solicitante_tel'],
   empresa:['status','completed_at','observacoes','latitude','longitude','loc_src'],
-  garantia:['garantia_tipo','garantia_obs','garantia_dt','garantia_user'],
+  garantia:['status','completed_at','garantia_tipo','garantia_obs','garantia_dt','garantia_user'],
   consorcio:['bairro','endereco','referencia','area','latitude','longitude','loc_src','tipo','qtd','observacoes','solicitante_nome','solicitante_tel','status','prioridade','empresa_id','usuario_responsavel_id','sla_horas','sla_pausado','completed_at','garantia_tipo','garantia_obs','garantia_dt','garantia_user'],
   master:['bairro','endereco','referencia','area','latitude','longitude','loc_src','tipo','qtd','observacoes','solicitante_nome','solicitante_tel','status','prioridade','empresa_id','usuario_responsavel_id','sla_horas','sla_pausado','completed_at','garantia_tipo','garantia_obs','garantia_dt','garantia_user']
 };
@@ -1529,6 +1529,7 @@ function podeMudarStatus(c){
   if(CU.perfil==='master') return true;
   if(CU.perfil==='consorcio') return !!CU.consorcio_id && c.consorcio_id===CU.consorcio_id;
   if(CU.perfil==='empresa') return !!CU.empresa_id && c.empresa_id===CU.empresa_id;
+  if(CU.perfil==='garantia') return !!CU.consorcio_id && c.consorcio_id===CU.consorcio_id && c.status==='Aguardando Garantia LED' && !!c.garantia_tipo;
   return false;
 }
 // ═══ DRAWER ═══
@@ -1545,7 +1546,7 @@ function abrirDrawer(id){
   // Step 0 = Recebido (automático, não clicável). Steps 1-4 são clicáveis
   const podeMudar = podeMudarStatus(c);
   document.getElementById('dw-steps').innerHTML=stepLbls.map((s,i)=>`
-    <div class="ss-item" ${i>0&&podeMudar?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Seu perfil pode consultar, mas não alterar o status"'} style="${i===0?'cursor:default;opacity:.85':podeMudar?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
+    <div class="ss-item" ${i>0&&podeMudar&&(CU?.perfil!=='garantia'||i===4)?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Seu perfil pode consultar, mas não alterar o status"'} style="${i===0?'cursor:default;opacity:.85':podeMudar?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
       <div class="ss-circle ${i<ci?'done':i===ci?'active':'idle'}">${i<ci?'✓':stepIcos[i]}</div>
       <div class="ss-label ${i<ci?'done':i===ci?'active':''}">${s}${i===0?'<br><span style="font-size:8px;color:var(--gray-400)">(automático)</span>':''}</div>
     </div>${i<4?`<div class="ss-line ${i<ci?'done':''}"></div>`:''}`).join('');
@@ -1878,6 +1879,10 @@ const s2s=['Recebido','Em programação','Em execução','Aguard. material','Con
 const s2sLabel={'Recebido':'Recebido','Em programação':'Em programação','Em execução':'Em execução','Aguard. material':'Aguard. material','Concluído':'Concluído','Aguardando Garantia LED':'⚡ Garantia LED'};
 const s2c=['#1251A3','#B45309','#0D7A55','#6D28D9','#10B981'];
 async function alterarStatus(id,step){
+  if(CU?.perfil==='garantia'){
+    if(step===4){const c=DB.chamados.find(x=>x.id===id);if(c&&podeMudarStatus(c)){CC=c;abrirModalConcluir();return;}}
+    showToast('Garantia LED só pode concluir chamados de garantia atribuídos.','erro');return;
+  }
   if(step===0) return; // "Recebido" é status automático — não permite alteração manual
   const c=DB.chamados.find(x=>x.id===id);if(!c)return;
   if(!podeMudarStatus(c)){
