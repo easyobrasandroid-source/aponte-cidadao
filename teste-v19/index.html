@@ -2279,22 +2279,24 @@ function getMats(){
 function renderEstoqueGrid(){
   const mats=getMats();
   const criticos=mats.filter(m=>(m.disp/m.cont)*100<20||(m.min&&m.disp<m.min));
-  const totalSaidas=mats.reduce((acc,m)=>acc+(m.cont-m.disp),0);
+  // Contratado - disponível NÃO é consumo comprovado. Exibir apenas movimentos registrados.
+  const totalSaidas=Number.isInteger(window._v19SaidasMes)?window._v19SaidasMes:null;
   document.getElementById('stk-total').textContent=mats.length;
   document.getElementById('stk-critico').textContent=criticos.length;
-  document.getElementById('stk-saidas').textContent=totalSaidas.toLocaleString('pt-BR');
+  document.getElementById('stk-saidas').textContent=totalSaidas===null?'—':totalSaidas.toLocaleString('pt-BR');
   const grid=document.getElementById('stk-grid-body');
   if(!grid) return;
+  const escEstoque=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   grid.innerHTML=mats.map(m=>{
-    const pct=Math.round((m.disp/m.cont)*100);
+    const pct=m.cont>0?Math.round((m.disp/m.cont)*100):0;
     const alerta=m.min&&m.disp<m.min;
     const cor=pct<20||alerta?'var(--red)':pct<35?'#D97706':'var(--green)';
     return`<div class="stk-card" style="cursor:pointer" onclick="abrirMovimentacao('${m.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
-        <div style="font-size:13px;font-weight:700">${m.n}</div>
+        <div style="font-size:13px;font-weight:700">${escEstoque(m.n)}</div>
         <button onclick="event.stopPropagation();editarMaterial('${m.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--gray-400);padding:2px 5px;border-radius:4px" title="Editar material">✏️</button>
       </div>
-      <div style="font-size:11px;color:var(--gray-400);margin-bottom:7px">${m.u} · Contratado: ${m.cont} · Mín: ${m.min||'—'}</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-bottom:7px">${escEstoque(m.u)} · Contratado: ${m.cont} · Mín: ${m.min||'—'}</div>
       <div class="stk-bw"><div class="stk-b" style="width:${pct}%;background:${cor}"></div></div>
       <div style="font-size:12px;font-weight:700;margin-top:5px;color:${cor}">${m.disp} restantes (${pct}%)</div>
       ${alerta?'<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:600">⚠ Abaixo do mínimo</div>':''}
@@ -2318,7 +2320,7 @@ function vEstoque(b,t,a){
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem">
       <div class="kpi"><div class="kpi-accent" style="background:var(--brand)"></div><div class="kpi-label">Itens cadastrados</div><div class="kpi-val" style="color:var(--brand)" id="stk-total">—</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Estoque crítico</div><div class="kpi-val" style="color:var(--red)" id="stk-critico">—</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Saídas no mês</div><div class="kpi-val" style="color:var(--green)" id="stk-saidas">—</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Movimentos de saída no mês</div><div class="kpi-val" style="color:var(--green)" id="stk-saidas">—</div></div>
     </div>
     <div class="stk-grid" id="stk-grid-body"></div>
     <!-- MODAL MATERIAL -->
