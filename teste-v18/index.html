@@ -832,11 +832,21 @@ async function sbSaveChamadoMaterial(protocolo, materialId, qtd, precoUnit){
 }
 
 async function sbGetChamados(){
-  try {
-    const data = await sbFetch('chamados?order=created_at.desc&limit=500');
-    console.log('[Supabase] chamados carregados:', data.length);
-    return data;
-  } catch(e){ console.warn('[Supabase] buscar chamados:', e.message); return null; }
+  // Supabase REST costuma limitar linhas por requisição; buscar todas as páginas.
+  // Se exceder o teto defensivo, falhar explicitamente em vez de exibir total incompleto.
+  const todos=[];
+  const pageSize=500, maxPages=100;
+  for(let page=0;page<maxPages;page++){
+    const from=page*pageSize;
+    const parte=await sbFetch('chamados?select=*&order=created_at.desc,id.desc&limit='+pageSize+'&offset='+from);
+    if(!Array.isArray(parte))throw new Error('Resposta inválida ao carregar chamados.');
+    todos.push(...parte);
+    if(parte.length<pageSize){
+      console.log('[Supabase] chamados carregados:',todos.length);
+      return todos;
+    }
+  }
+  throw new Error('Limite de consulta atingido. Aumente a paginação antes de exibir totais.');
 }
 
 // Payload normalizado. Na atualização, comparar com a fotografia original para
@@ -3715,7 +3725,12 @@ const CONSORCIO_PADRAO='1bfffc11-4abf-4495-adfe-4231e87803c6'; // CIS Caparaó (
 function mapEmpresa(r){ return {id:r.id, nome:r.nome, cnpj:r.cnpj||'', end:r.endereco||'', cidade:r.cidade||'', uf:r.uf||'MG', tel:r.telefone||'', email:r.email||'', resp:r.responsavel||'', status:r.status||'ativo', consorcio_id:r.consorcio_id}; }
 function getEmpresas(){ return DB.empresas||[]; } // cache em memória (fonte real = Supabase)
 async function carregarEmpresas(){
-  const rows = await sbSelect('empresas','select=*&order=nome.asc');
+  // Empresa não deve solicitar a lista de outros prestadores nem mesmo para filtrar depois.
+  const query=CU?.perfil==='empresa'
+    ? (CU.empresa_id?'select=*&id=eq.'+encodeURIComponent(CU.empresa_id):null)
+    : 'select=*&order=nome.asc';
+  if(query===null)throw new Error('Empresa não vinculada ao usuário.');
+  const rows = await sbSelect('empresas',query);
   if(rows===null) throw new Error('Não foi possível carregar as empresas do banco.');
   DB.empresas = rows.map(mapEmpresa); saveDB(DB);
   return DB.empresas;
@@ -3727,13 +3742,7 @@ async function vEmpresas(b,t,a){
   a.innerHTML=podeGerirEmpresas?'<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>':'';
   b.innerHTML='<div style="padding:2.5rem;text-align:center;color:var(--gray-400)">Carregando empresas do banco…</div>';
   let emps;
-  try{ emps=await carregarEmpresas(); if(CU?.perfil==='empresa'){
-      if(!CU.empresa_id)throw new Error('Perfil empresa sem vínculo cadastrado.');
-      const soMinha=await sbSelect('empresas','id=eq.'+encodeURIComponent(CU.empresa_id));
-      if(!Array.isArray(soMinha))throw new Error('Não foi possível validar a empresa vinculada.');
-      emps=emps.filter(e=>String(e.id)===String(CU.empresa_id));
-      if(soMinha.length===0) emps=[];
-    } }
+  try{ emps=await carregarEmpresas(); }
   catch(e){ b.innerHTML='<div class="tcard" style="padding:2.5rem;text-align:center;color:var(--red)">⚠ '+e.message+'<br><button class="btn btn-ghost" style="margin-top:12px" onclick="showView(\'empresas\')">↻ Tentar novamente</button></div>'; return; }
 
   function renderEmps(lista){
