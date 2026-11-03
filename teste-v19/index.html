@@ -2567,7 +2567,7 @@ function gerarExcel(tipo){
       let ws, nome;
       if(tipo==='chamados'){
         nome='Chamados';
-        const srcXlCh=_exportChamados||DB.chamados;_exportChamados=null;
+        const srcXlCh=_exportChamados||[];
         let rows=srcXlCh.map(c=>({
           'Protocolo':c.protocolo,
           'Data Abertura':c.created_at?new Date(c.created_at).toLocaleString('pt-BR'):(c.data+' '+(c.hora||'')),
@@ -2598,7 +2598,7 @@ function gerarExcel(tipo){
           {'Indicador':'Tempo médio (estimado)','Valor':'2,4 dias'},
         ];
         // Detalhe por chamado
-        const srcXlSLA=_exportChamados||DB.chamados;_exportChamados=null;
+        const srcXlSLA=_exportChamados||[];
         const detalhe=srcXlSLA.map(c=>{
           let tempoH='—';
           if(c.created_at&&c.completed_at){
@@ -2678,7 +2678,7 @@ function gerarPDF(tipo){
       </style>`;
       if(tipo==='chamados'){
         titulo='Relatório de Chamados';
-        const srcCh=_exportChamados||DB.chamados;_exportChamados=null;
+        const srcCh=_exportChamados||[];
         let rows=srcCh.map(c=>{
           const cls=c.status==='Em atraso'?'err':c.status==='Concluído'?'ok':'warn';
           return`<tr>
@@ -2703,7 +2703,7 @@ function gerarPDF(tipo){
         <table><thead><tr><th>Protocolo</th><th>Cidade</th><th>Tipo</th><th>Status</th><th>Empresa</th><th>Data</th><th>SLA</th><th>Origem</th></tr></thead><tbody>${rows}</tbody></table>`;
       } else if(tipo==='sla'){
         titulo='Relatório de SLA';
-        const srcSLA=_exportChamados||DB.chamados;_exportChamados=null;
+        const srcSLA=_exportChamados||[];
         const totalSLA=srcSLA.length,coSLA=srcSLA.filter(c=>c.status==='Concluído').length,atSLA=srcSLA.filter(c=>c.status==='Em atraso').length,pctSLA2=totalSLA?Math.round((coSLA/totalSLA)*100):0;
         let rows=srcSLA.map(c=>{
           let tempo='—';
@@ -2729,7 +2729,7 @@ function gerarPDF(tipo){
         <table><thead><tr><th>Protocolo</th><th>Cidade</th><th>Tipo</th><th>Status</th><th>Empresa</th><th>Tempo</th><th>SLA</th><th>No prazo?</th></tr></thead><tbody>${rows}</tbody></table>`;
       } else if(tipo==='estoque'){
         titulo='Relatório de Estoque';
-        const mats=(_exportMats||getMats());_exportMats=null;
+        const mats=(_exportMats||[]);;
         const crit=mats.filter(m=>m.disp<(m.min||0)||(m.disp/m.cont)*100<20).length;
         const totalConsumo=mats.reduce((a,m)=>a+(m.cont-m.disp),0);
         const totalVal=mats.reduce((a,m)=>a+((m.preco||0)*(m.cont-m.disp)),0);
