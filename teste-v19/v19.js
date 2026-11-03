@@ -134,8 +134,32 @@
   };
 
   const previousVEstoque = window.vEstoque;
+  async function contarMovimentosSaidaMes() {
+    // Mês civil de Brasília; contamos MOVIMENTOS, não misturamos
+    // quantidade de unidades, metros e quilogramas.
+    const pieces=Object.fromEntries(new Intl.DateTimeFormat('pt-BR',
+      {timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(new Date())
+      .map(p=>[p.type,p.value]));
+    const first=pieces.year+'-'+pieces.month+'-01';
+    let count=0;
+    for(let off=0;off<25000;off+=500){
+      const rows=await sbFetch('movimentacoes?select=id&tipo=in.(saida,consumo)'+
+        '&created_at=gte.'+encodeURIComponent(first+'T00:00:00-03:00')+
+        '&order=created_at.desc&limit=500&offset='+off);
+      if(!Array.isArray(rows))throw new Error('Histórico de movimentos indisponível.');
+      count+=rows.length;
+      if(rows.length<500)return count;
+    }
+    throw new Error('Mais de 25 mil saídas mensais. Evitando contagem parcial.');
+  }
   window.vEstoque = function (b,t,a) {
+    window._v19SaidasMes=null;
     previousVEstoque(b,t,a);
+    contarMovimentosSaidaMes().then(count=>{
+      if(t.textContent!=='Controle de estoque'||!document.getElementById('stk-saidas'))return;
+      window._v19SaidasMes=count;
+      document.getElementById('stk-saidas').textContent=count.toLocaleString('pt-BR');
+    }).catch(e=>{console.warn('[V19] movimentos do mês:',e.message);});
     if (!isAdmin()) {
       a.innerHTML='<span style="color:var(--gray-500);font-size:12px">Consulta de estoque. Baixas em chamados autorizados.</span>';
     }
