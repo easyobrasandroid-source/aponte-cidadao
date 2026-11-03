@@ -21,11 +21,17 @@ BEGIN
   IF EXISTS(SELECT 1 FROM public.usuarios WHERE perfil='master') THEN
     RAISE EXCEPTION 'Master ja existe: bootstrap bloqueado para evitar duplicacao';
   END IF;
-  SELECT count(*), min(id) INTO v_count,v_auth_id
+  SELECT count(*) INTO v_count
     FROM auth.users
    WHERE lower(email)=v_email;
-  IF v_count<>1 OR v_auth_id IS NULL THEN
+  IF v_count<>1 THEN
     RAISE EXCEPTION 'Esperada 1 conta no Auth para o e-mail fornecido; encontradas %',v_count;
+  END IF;
+  SELECT id INTO STRICT v_auth_id
+    FROM auth.users
+   WHERE lower(email)=v_email;
+  IF v_auth_id IS NULL THEN
+    RAISE EXCEPTION 'Conta Auth sem identificador valido';
   END IF;
   IF EXISTS(SELECT 1 FROM public.usuarios
              WHERE auth_user_id=v_auth_id OR lower(email)=v_email) THEN
