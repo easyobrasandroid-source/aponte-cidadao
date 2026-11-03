@@ -1083,96 +1083,86 @@ function navChamados(statusFilter, label){
 // ═══ DASHBOARD ═══
 function vDashboard(b,t,a){
   t.textContent='Dashboard gerencial';
-  a.innerHTML=`<span style="font-size:11px;padding:4px 10px;background:var(--brand-light);color:var(--brand);border-radius:20px;font-weight:600">CIS Caparaó</span>
-  <select id="dash-cidade" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
-    <option value="">Todas as cidades</option><option>Espera Feliz</option><option>Caparaó</option><option>Alto Caparaó</option><option>Carangola</option><option>Manhuaçu</option><option>Divino</option>
-  </select>
-  <select id="dash-periodo" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
-    <option value="">Junho 2026</option><option value="maio">Maio 2026</option><option value="30d">Últimos 30 dias</option>
-  </select>`;
-  const at=DB.chamados.filter(c=>c.status==='Em atraso').length,co=DB.chamados.filter(c=>c.status==='Concluído').length,an=DB.chamados.filter(c=>['Em execução','Em programação','Recebido'].includes(c.status)).length;
-  // Ler filtros ativos do dashboard
-  const dashCidade = document.getElementById('dash-cidade')?.value || '';
-  const dashPeriodo = document.getElementById('dash-periodo')?.value || '';
-
-  b.innerHTML=`
-  <div class="alerts-bar"><strong>⚠️ Alertas:</strong>
-    <span>🔴 ${at} chamado(s) em atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
-    <span>🟡 Manhuaçu com maior índice de atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
-    <span>🟠 Estoque Lamp. LED 100w abaixo do mínimo</span>
-  </div>
-  <div class="kpi-grid">
-    <div class="kpi" style="cursor:pointer" onclick="navChamados('all','Todos os chamados')" title="Ver todos os chamados">
-      <div class="kpi-accent" style="background:var(--brand)"></div>
-      <div class="kpi-label">Total chamados</div>
-      <div class="kpi-val" style="color:var(--brand)">${DB.chamados.length}</div>
-      <div class="kpi-sub">no período</div>
-      <div class="kpi-trend" style="color:var(--green)">↑ +18% vs. mês anterior</div>
-      <div style="font-size:10px;color:var(--brand);margin-top:4px;opacity:.7">Clique para ver →</div>
-    </div>
-    <div class="kpi" style="cursor:pointer" onclick="navChamados('andamento','Em andamento')" title="Ver chamados em andamento">
-      <div class="kpi-accent" style="background:#D97706"></div>
-      <div class="kpi-label">Em andamento</div>
-      <div class="kpi-val" style="color:#D97706">${an}</div>
-      <div class="kpi-sub">programação + execução</div>
-      <div class="kpi-trend" style="color:var(--green)">↓ -7%</div>
-      <div style="font-size:10px;color:#D97706;margin-top:4px;opacity:.7">Clique para ver →</div>
-    </div>
-    <div class="kpi" style="cursor:pointer" onclick="navChamados('Em atraso','Em atraso (SLA)')" title="Ver chamados em atraso">
-      <div class="kpi-accent" style="background:var(--red)"></div>
-      <div class="kpi-label">Em atraso (SLA)</div>
-      <div class="kpi-val" style="color:var(--red)">${at}</div>
-      <div class="kpi-sub">prazo ultrapassado</div>
-      <div class="kpi-trend" style="color:var(--red)">↑ urgente</div>
-      <div style="font-size:10px;color:var(--red);margin-top:4px;opacity:.7">Clique para ver →</div>
-    </div>
-    <div class="kpi" style="cursor:pointer" onclick="navChamados('Concluído','Concluídos')" title="Ver chamados concluídos">
-      <div class="kpi-accent" style="background:var(--green)"></div>
-      <div class="kpi-label">Concluídos</div>
-      <div class="kpi-val" style="color:var(--green)">${co}</div>
-      <div class="kpi-sub">taxa de resolução</div>
-      <div class="kpi-trend" style="color:var(--green)">↑ +5%</div>
-      <div style="font-size:10px;color:var(--green);margin-top:4px;opacity:.7">Clique para ver →</div>
-    </div>
-  </div>
-  <div class="kpi-grid2">
-    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Urbana',label:'Área Urbana'};showView('chamados')" title="Ver chamados urbanos"><div class="kpi2-ico" style="background:var(--brand-light)">🏙</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Urbanos</div><div style="font-size:18px;font-weight:800;color:var(--brand)" id="kpi-urb">—</div></div></div>
-    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Rural',label:'Área Rural'};showView('chamados')" title="Ver chamados rurais"><div class="kpi2-ico" style="background:var(--green-light)">🌾</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Rurais</div><div style="font-size:18px;font-weight:800;color:var(--green)" id="kpi-rur">—</div></div></div>
-    <div class="kpi2"><div class="kpi2-ico" style="background:var(--amber-light)">🎯</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">SLA cumprido</div><div style="font-size:18px;font-weight:800;color:var(--amber)">96%</div></div></div>
-    <div class="kpi2" style="cursor:pointer" onclick="navChamados('Aguardando Garantia LED','Garantia LED')" title="Ver chamados em garantia LED">
-      <div class="kpi2-ico" style="background:#FFF8DC;font-size:16px">⚡</div>
-      <div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Garantia LED</div><div style="font-size:18px;font-weight:800;color:#B8860B"><span id="kpi-garantia-led">0</span></div></div>
-    </div>
-  </div>
-  <div class="row21">
-    <div class="card"><div class="card-title">Evolução mensal — 2026</div><div style="height:200px"><canvas id="chartEv"></canvas></div></div>
-    <div class="card"><div class="card-title">Por status</div><div style="height:200px"><canvas id="chartSt"></canvas></div></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-    <div class="card"><div class="card-title">Desempenho por cidade</div>
-      ${[{n:'Espera Feliz',p:99},{n:'Caparaó',p:98},{n:'Alto Caparaó',p:96},{n:'Carangola',p:95},{n:'Divino',p:99},{n:'Manhuaçu',p:82}].map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-50)"><span style="font-size:11px;min-width:90px;color:var(--gray-600)">${c.n}</span><div style="flex:1;height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden"><div style="width:${c.p}%;height:5px;border-radius:3px;background:${c.p>=95?'var(--green)':'var(--red)'}"></div></div><span style="font-size:10px;font-weight:700;min-width:30px;text-align:right;color:${c.p>=95?'var(--green)':'var(--red)'}">${c.p}%</span></div>`).join('')}
-    </div>
-    <div class="card"><div class="card-title">Tipo de problema</div><div style="height:180px"><canvas id="chartTp"></canvas></div></div>
-    <div class="card"><div class="card-title">⚠️ Alertas gerenciais</div>
-      ${[['🔴','Manhuaçu +45% chamados este mês','#FEF2F2'],['🚨','SLA vencendo: '+at+' chamados críticos','#FEF2F2'],['🟠','Lâmpadas apagadas +18% vs. mês','#FFFBEB'],['ℹ️','Estoque Lamp. LED 100w baixo','#EFF6FF']].map(([i,tx,bg])=>`<div style="display:flex;gap:8px;padding:8px 10px;border-radius:7px;margin-bottom:6px;background:${bg}"><span>${i}</span><span style="font-size:11px;font-weight:500">${tx}</span></div>`).join('')}
-    </div>
-  </div>`;
-  // Preencher KPIs dinâmicos
-  setTimeout(()=>{
-    const kpiGar=document.getElementById('kpi-garantia-led');
-    if(kpiGar) kpiGar.textContent=DB.chamados.filter(c=>c.status==='Aguardando Garantia LED').length;
-    const kpiUrb=document.getElementById('kpi-urb');
-    if(kpiUrb) kpiUrb.textContent=DB.chamados.filter(c=>c.area==='Urbana').length;
-    const kpiRur=document.getElementById('kpi-rur');
-    if(kpiRur) kpiRur.textContent=DB.chamados.filter(c=>c.area==='Rural').length;
-  },50);
-
-  setTimeout(()=>{
-    Chart.defaults.font.family='Inter';
-    new Chart(document.getElementById('chartEv'),{type:'line',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Abertos',data:[820,750,1010,880,920,947],borderColor:'#1251A3',backgroundColor:'rgba(18,81,163,.07)',fill:true,tension:.4,pointRadius:3},{label:'Concluídos',data:[800,740,980,860,900,DB.chamados.length*10],borderColor:'#0D7A55',backgroundColor:'rgba(13,122,85,.07)',fill:true,tension:.4,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:9,usePointStyle:true,pointStyle:'circle',font:{size:10}}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#F3F4F6'}}}}});
-    new Chart(document.getElementById('chartSt'),{type:'doughnut',data:{labels:['Novo','Programação','Em execução','Em atraso','Concluído'],datasets:[{data:[47,89,94,at*10,co*100+1000],backgroundColor:['#3B82F6','#F59E0B','#10B981','#EF4444','#059669'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
-    new Chart(document.getElementById('chartTp'),{type:'doughnut',data:{labels:['Apagada','Piscando','Acesa de dia','Poste danificado','Outro'],datasets:[{data:[748,312,98,46,22],backgroundColor:['#1251A3','#3B82F6','#F59E0B','#EF4444','#9CA3AF'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
-  },100);
+  // A consulta respeita RLS no servidor; os filtros abaixo reforçam o escopo na interface.
+  // Nunca apresentar gráficos ou SLA simulados como dados reais.
+  const previous=vDashboard._filtros||{periodo:'30d',cidade:''};
+  const periodo=previous.periodo;
+  const cidade=previous.cidade;
+  a.innerHTML='<span style="font-size:12px;color:var(--gray-500)">Indicadores baseados em chamados reais</span>';
+  b.innerHTML='<div style="padding:2rem;text-align:center;color:var(--gray-500)">Carregando indicadores do Supabase…</div>';
+  carregarChamadosDoBanco().then(ok=>{
+    if(!ok){
+      b.innerHTML='<div class="tcard" style="padding:2rem;color:var(--red)">Não foi possível consultar os chamados no banco. Nenhum indicador foi estimado. <button class="btn btn-ghost" onclick="showView(\'dashboard\')">Tentar novamente</button></div>';
+      return;
+    }
+    let todos=Array.isArray(DB.chamados)?DB.chamados:[];
+    if(CU?.perfil==='consorcio')todos=todos.filter(c=>c.consorcio_id===CU.consorcio_id);
+    else if(CU?.perfil==='prefeitura')todos=todos.filter(c=>c.cidade_id===CU.cidade_id);
+    else if(CU?.perfil==='empresa')todos=todos.filter(c=>c.empresa_id===CU.empresa_id);
+    else if(CU?.perfil==='garantia')todos=todos.filter(c=>c.garantia_tipo||c.status==='Aguardando Garantia LED');
+    const cidades=[...new Set(todos.map(c=>c.cidade).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const agora=Date.now();
+    const days={ '30d':30,'90d':90 };
+    const filtered=todos.filter(c=>{
+      if(cidade&&c.cidade!==cidade)return false;
+      if(periodo in days){
+        const dt=Date.parse(c.created_at||'');
+        return Number.isFinite(dt)&&dt>=agora-days[periodo]*86400000&&dt<=agora;
+      }
+      if(periodo.startsWith('mes:')){
+        const dt=Date.parse(c.created_at||'');
+        return Number.isFinite(dt)&&new Date(dt).toISOString().slice(0,7)===periodo.slice(4);
+      }
+      return true;
+    });
+    const completos=filtered.filter(c=>c.status==='Concluído').length;
+    const ativos=filtered.length-completos;
+    const urbanos=filtered.filter(c=>c.area==='Urbana').length;
+    const rurais=filtered.filter(c=>c.area==='Rural').length;
+    const qtGarantia=filtered.filter(c=>c.garantia_tipo||c.status==='Aguardando Garantia LED').length;
+    const categorias={};
+    filtered.forEach(c=>{const k=c.status||'Não informado';categorias[k]=(categorias[k]||0)+1;});
+    const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const kpi=(nome,valor,sub,cor)=>'<div class="kpi"><div class="kpi-accent" style="background:'+cor+'"></div><div class="kpi-label">'+nome+'</div><div class="kpi-val" style="color:'+cor+'">'+valor+'</div><div class="kpi-sub">'+sub+'</div></div>';
+    const dadosCompletos=filtered.length<500;
+    b.innerHTML='<div class="tcard" style="padding:14px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
+      '<label style="font-size:12px">Período <select id="dash-periodo" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="all">Todo o histórico carregado</option><option value="mes">Escolher mês</option></select></label>'+
+      '<input id="dash-mes" type="month" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px" />'+
+      '<label style="font-size:12px">Cidade <select id="dash-cidade" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px"><option value="">Todas as cidades autorizadas</option>'+cidades.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label></div>'+
+      (!dadosCompletos?'<div class="alerts-bar">⚠ Foram carregados até 500 chamados. Os números não são necessariamente totais do banco; é necessário implementar paginação.</div>':'')+
+      '<div class="kpi-grid">'+
+      kpi('Chamados',filtered.length,'No filtro selecionado','var(--brand)')+
+      kpi('Em andamento',ativos,'Não concluídos','#D97706')+
+      kpi('Concluídos',completos,'Com status Concluído','var(--green)')+
+      kpi('Garantia LED',qtGarantia,'Marcados como garantia','#8B5CF6')+
+      kpi('Área urbana',urbanos,'Chamados urbanos','var(--brand)')+
+      kpi('Área rural',rurais,'Chamados rurais','#0D7A55')+
+      '</div><div class="tcard" style="padding:16px;margin-top:14px"><strong>Situação dos chamados</strong>'+
+      Object.entries(categorias).sort((x,y)=>y[1]-x[1]).map(([x,n])=>'<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--gray-100);padding:8px 0"><span>'+esc(x)+'</span><strong>'+n+'</strong></div>').join('')+
+      (!filtered.length?'<p style="padding:12px 0;color:var(--gray-500)">Nenhum chamado no período e cidade selecionados.</p>':'')+
+      '<p style="font-size:11px;color:var(--gray-500);margin-top:12px">SLA: aguardando cálculo auditado de prazo e pausas. Nenhum percentual fictício foi utilizado.</p></div>';
+    const p=document.getElementById('dash-periodo'), m=document.getElementById('dash-mes'), c=document.getElementById('dash-cidade');
+    const mesSelecionado=periodo.startsWith('mes:')?periodo.slice(4):new Date().toISOString().slice(0,7);
+    p.value=periodo.startsWith('mes:')?'mes':periodo;
+    m.value=mesSelecionado;
+    m.style.display=p.value==='mes'?'inline-block':'none';
+    c.value=cidades.includes(cidade)?cidade:'';
+    p.onchange=()=>{
+      m.style.display=p.value==='mes'?'inline-block':'none';
+      vDashboard._filtros={periodo:p.value==='mes'?'mes:'+m.value:p.value,cidade:c.value};
+      vDashboard(b,t,a);
+    };
+    m.onchange=()=>{
+      vDashboard._filtros={periodo:'mes:'+m.value,cidade:c.value};
+      vDashboard(b,t,a);
+    };
+    c.onchange=()=>{
+      vDashboard._filtros={periodo:p.value==='mes'?'mes:'+m.value:p.value,cidade:c.value};
+      vDashboard(b,t,a);
+    };
+  }).catch(e=>{
+    b.innerHTML='<div class="tcard" style="padding:2rem;color:var(--red)">Erro ao carregar indicadores: '+String(e.message||e).replace(/[<>]/g,'')+'</div>';
+  });
 }
 
 // ═══ CHAMADOS ═══
@@ -3733,10 +3723,17 @@ async function carregarEmpresas(){
 
 async function vEmpresas(b,t,a){
   t.textContent='Empresas executoras';
-  a.innerHTML=`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`;
+  const podeGerirEmpresas=['master','consorcio'].includes(CU?.perfil);
+  a.innerHTML=podeGerirEmpresas?'<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>':'';
   b.innerHTML='<div style="padding:2.5rem;text-align:center;color:var(--gray-400)">Carregando empresas do banco…</div>';
   let emps;
-  try{ emps=await carregarEmpresas(); }
+  try{ emps=await carregarEmpresas(); if(CU?.perfil==='empresa'){
+      if(!CU.empresa_id)throw new Error('Perfil empresa sem vínculo cadastrado.');
+      const soMinha=await sbSelect('empresas','id=eq.'+encodeURIComponent(CU.empresa_id));
+      if(!Array.isArray(soMinha))throw new Error('Não foi possível validar a empresa vinculada.');
+      emps=emps.filter(e=>String(e.id)===String(CU.empresa_id));
+      if(soMinha.length===0) emps=[];
+    } }
   catch(e){ b.innerHTML='<div class="tcard" style="padding:2.5rem;text-align:center;color:var(--red)">⚠ '+e.message+'<br><button class="btn btn-ghost" style="margin-top:12px" onclick="showView(\'empresas\')">↻ Tentar novamente</button></div>'; return; }
 
   function renderEmps(lista){
@@ -3748,11 +3745,11 @@ async function vEmpresas(b,t,a){
       <td style="font-size:12px">${e.tel}</td>
       <td style="font-size:12px">${e.resp}</td>
       <td><span style="background:${e.status==='ativo'?'var(--green-light)':'var(--gray-100)'};color:${e.status==='ativo'?'var(--green)':'var(--gray-500)'};font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px">${e.status==='ativo'?'Ativa':'Inativa'}</span></td>
-      <td><div style="display:flex;gap:5px">
+      <td>${podeGerirEmpresas?`<div style="display:flex;gap:5px">
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="abrirModalEmpresa('${e.id}')">✏️ Editar</button>
-        <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="toggleEmpresa('${e.id}')" title="${e.status==='ativo'?'Desativar':'Ativar'}">${e.status==='ativo'?'⛔':'✅'}</button>
-        <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="excluirEmpresa('${e.id}')" title="Excluir">🗑</button>
-      </div></td>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="toggleEmpresa('${e.id}')">Alterar status</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="excluirEmpresa('${e.id}')">Excluir</button>
+      </div>`:'Somente leitura'}</td>
     </tr>`).join('');
   }
 
@@ -3786,13 +3783,14 @@ async function vEmpresas(b,t,a){
   window.filtrarEmpresas=function(){
     const busca=(document.getElementById('emp-busca')?.value||'').toLowerCase();
     const fst=document.getElementById('emp-fstatus')?.value||'';
-    let lista=getEmpresas();
+    let lista=CU?.perfil==='empresa'?getEmpresas().filter(e=>String(e.id)===String(CU.empresa_id)):getEmpresas();
     if(busca) lista=lista.filter(e=>e.nome.toLowerCase().includes(busca)||e.cnpj.includes(busca)||e.cidade.toLowerCase().includes(busca));
     if(fst) lista=lista.filter(e=>e.status===fst);
     const tb=document.getElementById('emp-tbody');
     if(tb) tb.innerHTML=renderEmps(lista);
   };
   window.toggleEmpresa=async function(id){
+    if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão.','erro');return;}
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     const novo=e.status==='ativo'?'inativo':'ativo';
@@ -3803,6 +3801,7 @@ async function vEmpresas(b,t,a){
     showToast((novo==='ativo'?'✅ Empresa ativada':'⛔ Empresa desativada')+': '+e.nome,'ok');
   };
   window.excluirEmpresa=async function(id){
+    if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão.','erro');return;}
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     if(!confirm('Excluir a empresa "'+e.nome+'"?\nSe houver chamados vinculados, o banco vai recusar — nesse caso, desative em vez de excluir.')) return;
