@@ -4022,6 +4022,9 @@ function calcSLAComConfig(chamado){
 
 function vSLA(b,t,a){
   t.textContent='Configuração de SLA';
+  // A edição anterior alterava apenas memória e exibia sucesso falso.
+  // Nesta etapa mostrar somente leitura até que a persistência por consórcio seja migrada.
+  const modoLeitura=true;
   // Consórcios disponíveis
   const cfg=getSLAConfig();
   const consorciosList=Object.keys(cfg);
@@ -4033,26 +4036,26 @@ function vSLA(b,t,a){
       <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${r.ico}</span><span style="font-size:12px;font-weight:600">${r.tipo}</span></div></td>
       <td>
         <div style="display:flex;align-items:center;gap:5px">
-          <input type="number" value="${r.urb.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" onchange="cfg['${cons}'][${i}].urb.prazo=parseInt(this.value)||1">
-          <select style="padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" onchange="cfg['${cons}'][${i}].urb.unid=this.value">
+          <input type="number" value="${r.urb.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" disabled onchange="cfg['${cons}'][${i}].urb.prazo=parseInt(this.value)||1">
+          <select style="padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" disabled onchange="cfg['${cons}'][${i}].urb.unid=this.value">
             <option ${r.urb.unid==='Horas'?'selected':''}>Horas</option>
             <option ${r.urb.unid==='Dias'?'selected':''}>Dias</option>
           </select>
         </div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:3px">Alerta:
-          <input type="number" value="${r.urb.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" onchange="cfg['${cons}'][${i}].urb.alerta=parseInt(this.value)||1"> h antes
+          <input type="number" value="${r.urb.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" disabled onchange="cfg['${cons}'][${i}].urb.alerta=parseInt(this.value)||1"> h antes
         </div>
       </td>
       <td>
         <div style="display:flex;align-items:center;gap:5px">
-          <input type="number" value="${r.rur.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" onchange="cfg['${cons}'][${i}].rur.prazo=parseInt(this.value)||1">
-          <select style="padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" onchange="cfg['${cons}'][${i}].rur.unid=this.value">
+          <input type="number" value="${r.rur.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" disabled onchange="cfg['${cons}'][${i}].rur.prazo=parseInt(this.value)||1">
+          <select style="padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" disabled onchange="cfg['${cons}'][${i}].rur.unid=this.value">
             <option ${r.rur.unid==='Horas'?'selected':''}>Horas</option>
             <option ${r.rur.unid==='Dias'?'selected':''}>Dias</option>
           </select>
         </div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:3px">Alerta:
-          <input type="number" value="${r.rur.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" onchange="cfg['${cons}'][${i}].rur.alerta=parseInt(this.value)||1"> h antes
+          <input type="number" value="${r.rur.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" disabled onchange="cfg['${cons}'][${i}].rur.alerta=parseInt(this.value)||1"> h antes
         </div>
       </td>
       <td style="text-align:center">
@@ -4065,11 +4068,10 @@ function vSLA(b,t,a){
     </tr>`).join('');
   }
 
-  a.innerHTML=`
-    <button class="btn btn-ghost" onclick="if(confirm('Restaurar prazos padrão para este consórcio?')){const c=document.getElementById('sla-cons-sel').value;DB.sla_config[c]=JSON.parse(JSON.stringify(SLA_PADRAO));saveDB(DB);vSLA(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));}">↺ Restaurar padrão</button>
-    <button class="btn btn-save" onclick="saveSLAConfig()">💾 Salvar SLA</button>`;
+  a.innerHTML='<span style="font-size:12px;color:var(--gray-500)">Somente leitura — sincronização com banco em implantação</span>';
 
   b.innerHTML=`
+  <div class="alerts-bar">⚠ Valores exibidos são referências da interface; edição suspensa até leitura e gravação confirmadas no Supabase.</div>
   <!-- SELETOR DE CONSÓRCIO -->
   <div class="card" style="margin-bottom:1rem">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -4077,7 +4079,7 @@ function vSLA(b,t,a){
       <select id="sla-cons-sel" style="font-size:13px;padding:7px 12px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'Inter',sans-serif;font-weight:600;color:var(--brand)" onchange="consAtivo=this.value;document.getElementById('sla-tbody').innerHTML=renderTabela(this.value);document.getElementById('sla-cons-nome').textContent=this.value">
         ${consorciosList.map(c=>`<option value="${c}">${c}</option>`).join('')}
       </select>
-      <button class="btn btn-ghost" style="font-size:11px" onclick="
+      <button disabled class="btn btn-ghost" style="font-size:11px" onclick="
         const nome=prompt('Nome do novo consórcio:');
         if(!nome||!nome.trim()) return;
         const cfg2=getSLAConfig();
@@ -4130,8 +4132,8 @@ function vSLA(b,t,a){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="sla-preview-kpis"></div>
   </div>`;
 
-  // Preencher preview de impacto
-  setTimeout(()=>{
+  // Sem telemetria auditada, não calcular prévia a partir de cache e configuração demonstrativa.
+  /* setTimeout(()=>{
     const kpis=document.getElementById('sla-preview-kpis');
     if(!kpis) return;
     const urb=DB.chamados.filter(c=>c.area==='Urbana');
@@ -4152,21 +4154,22 @@ function vSLA(b,t,a){
       ['🏙 Urbanos em atraso',urbAtras,'var(--red)','var(--red-light)'],
       ['🌾 Rurais em atraso',rurAtras,'#B8860B','#FFF8DC'],
     ].map(([l,v,cor,bg])=>`<div style="background:${bg};border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:${cor}">${v}</div><div style="font-size:9px;font-weight:700;color:${cor};text-transform:uppercase;margin-top:2px">${l}</div></div>`).join('');
-  },50);
+  },50); */
+  const preview=document.getElementById('sla-preview-kpis');
+  if(preview) preview.textContent='Aguardando integração com prazos e dados reais do banco.';
 }
 
 function saveSLAConfig(){
-  saveDB(DB);
-  showToast('✅ SLA salvo — prazos por consórcio e área aplicados em todos os chamados.','ok');
+  showToast('Salvamento de SLA indisponível até a integração com o banco. Nenhuma alteração foi gravada.','aviso');
 }
 
 // ═══ CONFIG PORTAL ═══
 function vConfigPortal(b,t,a){
   t.textContent='Configurações do portal público';
-  a.innerHTML=`<button class="btn btn-ghost" onclick="goPage('pg-portal')">👁 Ver portal</button><button class="btn btn-save" onclick="alert('Configurações salvas!')">💾 Salvar</button>`;
-  b.innerHTML=`<div style="background:var(--brand-light);border:1px solid #B3CDEE;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--brand)">🔗 <strong>URL pública:</strong><span style="font-family:'JetBrains Mono',monospace">https://apontecidadao.com.br/ciscaparao</span><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="navigator.clipboard?.writeText('https://apontecidadao.com.br/ciscaparao');alert('Link copiado!')">📋 Copiar</button></div>
+  a.innerHTML='<button class="btn btn-ghost" onclick="goPage(\'pg-portal\')">👁 Ver portal</button><span style="font-size:12px;color:var(--gray-500)">Configuração em implementação — sem salvamento disponível</span>';
+  b.innerHTML=`<div class="alerts-bar">⚠ Prévia demonstrativa. Estas opções não são persistidas nem alteram o funcionamento do portal.</div><div style="background:var(--brand-light);border:1px solid #B3CDEE;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--brand)">🔗 <strong>URL pública:</strong><span style="font-family:'JetBrains Mono',monospace">https://apontecidadao.com.br/ciscaparao</span><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="navigator.clipboard?.writeText('https://apontecidadao.com.br/ciscaparao');alert('Link copiado!')">📋 Copiar</button></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div class="card"><div class="card-title">⚙️ Funcionalidades</div>${[['Consulta pública de protocolo','Cidadão consulta status pelo número',true],['Abertura de chamado pelo portal','Cidadão abre chamados pelo site',true],['GPS obrigatório no mobile','Exigir GPS para abertura',false],['Exibir empresa responsável','Mostrar empresa na consulta',false],['Notificação por WhatsApp','Enviar atualizações ao cidadão',true]].map(([tt,d,on])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-50)"><div><div style="font-size:13px;font-weight:600">${tt}</div><div style="font-size:11px;color:var(--gray-400);margin-top:2px">${d}</div></div><div class="toggle ${on?'':'off'}" onclick="this.classList.toggle('off')"></div></div>`).join('')}</div>
+    <div class="card"><div class="card-title">⚙️ Funcionalidades</div>${[['Consulta pública de protocolo','Cidadão consulta status pelo número',true],['Abertura de chamado pelo portal','Cidadão abre chamados pelo site',true],['GPS obrigatório no mobile','Exigir GPS para abertura',false],['Exibir empresa responsável','Mostrar empresa na consulta',false],['Notificação por WhatsApp','Enviar atualizações ao cidadão',true]].map(([tt,d,on])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-50)"><div><div style="font-size:13px;font-weight:600">${tt}</div><div style="font-size:11px;color:var(--gray-400);margin-top:2px">${d}</div></div><div class="toggle ${on?'':'off'}" style="pointer-events:none;opacity:.5"></div></div>`).join('')}</div>
     <div class="card"><div class="card-title">💬 Mensagens ao cidadão</div>
       <div class="field"><label>Quando consulta está desabilitada</label><textarea style="font-family:'Inter',sans-serif;font-size:12px;padding:9px 11px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);width:100%;resize:none;min-height:60px;outline:none">Para consultar, ligue: (33) 3721-0000</textarea></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
