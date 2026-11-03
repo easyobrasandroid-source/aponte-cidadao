@@ -11,6 +11,8 @@
       return {estado:'Não apurável',resultado:null,tempo:null};
     if(c.sla_pausado)
       return {estado:'Pausado (sem histórico de pausa)',resultado:null,tempo:null};
+    if(c.status==='Concluído' && !c.completed_at)
+      return {estado:'Concluído sem data (não apurável)',resultado:null,tempo:null};
     const start=new Date(c.created_at).getTime(),end=c.completed_at?
       new Date(c.completed_at).getTime():Date.now();
     if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)
@@ -18,7 +20,9 @@
     const hours=(end-start)/36e5,finished=c.status==='Concluído',ok=hours<=prazo;
     return {estado:finished?(ok?'Concluído no prazo':'Concluído fora do prazo'):
       (ok?'Em andamento no prazo':'Em atraso'),
-      resultado:ok,tempo:hours,prazo};
+      // Cumprimento só é medido quando existe uma data de conclusão verificável.
+      resultado:finished?ok:null,tempo:hours,prazo,
+      vencido:!ok};
   };
   window.v19StatusSLA=statusSLA;
   let movimientos = [];
