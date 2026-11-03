@@ -77,6 +77,18 @@ BEGIN
   END IF;
 
   IF v_perfil='empresa' THEN
+    -- V19: atribuição pelo RPC v19_assumir_chamado. O navegador NÃO possui
+    -- RLS de UPDATE sobre chamado sem empresa, portanto apenas o RPC pode
+    -- realizar esta transição. Campos operacionais permanecem imutáveis.
+    IF OLD.empresa_id IS NULL
+       AND NEW.empresa_id IS NOT DISTINCT FROM public.minha_empresa()
+       AND OLD.status IN ('Recebido','Em programação')
+       AND public.empresa_atende(OLD.cidade_id)
+       AND (to_jsonb(NEW) - ARRAY['empresa_id','empresa','updated_at']::text[])
+         IS NOT DISTINCT FROM
+         (to_jsonb(OLD) - ARRAY['empresa_id','empresa','updated_at']::text[]) THEN
+      RETURN NEW;
+    END IF;
     IF OLD.empresa_id IS DISTINCT FROM public.minha_empresa() OR NEW.empresa_id IS DISTINCT FROM OLD.empresa_id
        OR NEW.cidade_id IS DISTINCT FROM OLD.cidade_id THEN
       RAISE EXCEPTION 'PROIBIDO: empresa tentou mudar atribuicao/cidade'; END IF;
