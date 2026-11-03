@@ -42,9 +42,7 @@ SELECT p.proname AS rpc,
        has_function_privilege('authenticated',p.oid,'EXECUTE')
          AS authenticated_executa,
        has_function_privilege('anon',p.oid,'EXECUTE') AS anon_executa,
-       has_function_privilege('PUBLIC',p.oid,'EXECUTE') AS public_executa,
        CASE WHEN has_function_privilege('anon',p.oid,'EXECUTE')
-                  OR has_function_privilege('PUBLIC',p.oid,'EXECUTE')
             THEN 'ALERTA_EXECUCAO_PUBLICA'
             ELSE 'OK_EXECUCAO_RESTRITA' END AS resultado
 FROM pg_proc p
