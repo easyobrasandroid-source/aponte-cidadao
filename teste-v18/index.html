@@ -739,41 +739,28 @@ async function sbGetMateriais(){
 // Salvar material (catálogo + estoque)
 async function sbSaveMaterial(mat){
   try{
-    // 1. Materiais (catálogo)
-    const matRow = {
-      nome: mat.n, unidade: mat.u||'Un.',
-      estoque_minimo: mat.min||0, preco_unitario: mat.preco||0,
-      status: 'ativo',
-    };
-    let materialId = mat._supaId || (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(mat.id||'') ? mat.id : null);
-    if(materialId){
-      // Já existe → UPDATE
-      await sbUpdate('materiais', 'id=eq.'+materialId, matRow);
-    } else {
-      // Novo → INSERT (Postgres gera o UUID)
-      const resp = await sbFetch('materiais', 'POST', matRow);
-      materialId = resp?.[0]?.id;
-    }
-    if(!materialId){ console.warn('[Estoque] material sem id retornado'); return false; }
-    // 2. Estoque (saldo) — verificar se já existe linha para esse material
-    const estExist = await sbSelect('estoques', 'material_id=eq.'+materialId);
-    const estRow = {
-      material_id: materialId,
-      quantidade_contratada: mat.cont||0,
-      quantidade_disponivel: mat.disp||0,
-      updated_at: new Date().toISOString(),
-    };
-    if(estExist && estExist[0]){
-      // Existe → UPDATE pelo id da linha de estoque
-      await sbUpdate('estoques', 'id=eq.'+estExist[0].id, estRow);
-    } else {
-      // Não existe → INSERT simples
-      await sbFetch('estoques', 'POST', estRow);
-    }
-    console.log('[Estoque] ✅ material salvo:', mat.n, materialId);
-    return materialId;
-  }catch(e){ console.error('[Estoque] saveMaterial:', e.message); return false; }
+    if(!['master','consorcio'].includes(CU?.perfil))throw new Error('Somente Master ou Consórcio podem alterar materiais.');
+    const materialId=mat._supaId || (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(mat.id||'') ? mat.id : null);
+    const consorcioId=mat.consorcio_id||CU?.consorcio_id||CONSORCIO_PADRAO;
+    const id=await sbFetch('rpc/v19_salvar_material','POST',{
+      p_material_id:materialId,
+      p_consorcio_id:consorcioId,
+      p_nome:mat.n,
+      p_unidade:mat.u||'Un.',
+      p_estoque_minimo:Number(mat.min)||0,
+      p_preco_unitario:Number(mat.preco)||0,
+      p_quantidade_contratada:Number(mat.cont)||0,
+      p_quantidade_disponivel:Number(mat.disp)||0
+    });
+    if(typeof id!=='string'||!/^[0-9a-f-]{36}$/i.test(id))throw new Error('O banco não confirmou o cadastro do material.');
+    return id;
+  }catch(e){
+    console.error('[Estoque] erro ao salvar material:',e);
+    showToast('Falha ao salvar material: '+String(e.message||e).replace(/[<>]/g,''),'erro');
+    return false;
+  }
 }
+
 // Excluir material
 async function sbDeleteMaterial(supaId){
   try{
@@ -1134,7 +1121,7 @@ function vDashboard(b,t,a){
     filtered.forEach(c=>{const k=c.status||'Não informado';categorias[k]=(categorias[k]||0)+1;});
     const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
     const kpi=(nome,valor,sub,cor)=>'<div class="kpi"><div class="kpi-accent" style="background:'+cor+'"></div><div class="kpi-label">'+nome+'</div><div class="kpi-val" style="color:'+cor+'">'+valor+'</div><div class="kpi-sub">'+sub+'</div></div>';
-    const dadosCompletos=filtered.length<500;
+    const dadosCompletos=true; // sbGetChamados percorre todas as páginas ou retorna erro.
     b.innerHTML='<div class="tcard" style="padding:14px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
       '<label style="font-size:12px">Período <select id="dash-periodo" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="all">Todo o histórico carregado</option><option value="mes">Escolher mês</option></select></label>'+
       '<input id="dash-mes" type="month" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px" />'+
@@ -2302,8 +2289,8 @@ function vEstoque(b,t,a){
   });
   a.innerHTML=`
     <button class="btn btn-ghost" onclick="abrirHistoricoMovimentacao()">📋 Histórico</button>
-    <button class="btn btn-ghost" onclick="abrirMovimentacao(null)">↕ Movimentação</button>
-    <button class="btn btn-save" onclick="abrirModalMaterial(null)">+ Adicionar material</button>`;
+${['master','consorcio'].includes(CU?.perfil)?`<button class="btn btn-ghost" onclick="abrirMovimentacao(null)">↕ Movimentação</button>
+    <button class="btn btn-save" onclick="abrirModalMaterial(null)">+ Adicionar material</button>`:''}`;
   b.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem">
       <div class="kpi"><div class="kpi-accent" style="background:var(--brand)"></div><div class="kpi-label">Itens cadastrados</div><div class="kpi-val" style="color:var(--brand)" id="stk-total">—</div></div>
@@ -2364,6 +2351,7 @@ function vEstoque(b,t,a){
 
 let _matEditId=null;
 function abrirModalMaterial(id){
+  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para editar materiais.','erro');return;}
   _matEditId=id;
   const overlay=document.getElementById('modal-mat-overlay');
   if(!overlay){vEstoque(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));return;}
@@ -2493,6 +2481,7 @@ async function abrirHistoricoMovimentacao(){
 }
 
 function abrirMovimentacao(matId){
+  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para movimentação manual.','erro');return;}
   const overlay=document.getElementById('modal-mov-overlay');
   if(!overlay){vEstoque(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));return;}
   const select=document.getElementById('mov-material');
@@ -2508,35 +2497,35 @@ function fecharModalMov(){
   if(overlay) overlay.style.display='none';
   document.body.style.overflow='';
 }
-async function salvarMovimentacao(){
+async async function salvarMovimentacao(){
+  if(!['master','consorcio'].includes(CU?.perfil)){
+    showToast('Seu perfil não pode movimentar estoque manualmente.','erro');return;
+  }
   const btn=document.querySelector('button[onclick="salvarMovimentacao()"]');
   if(btn?.disabled)return;
   const matId=document.getElementById('mov-material')?.value;
   const tipo=document.getElementById('mov-tipo')?.value;
   const qtd=Number(document.getElementById('mov-qtd')?.value);
-  if(!Number.isInteger(qtd)||qtd<1||!['saida','entrada'].includes(tipo)){
-    showToast('Informe uma quantidade inteira positiva.','erro');return;
+  if(!Number.isInteger(qtd)||qtd<1||!['saida','entrada'].includes(tipo)||!matId){
+    showToast('Selecione um material e uma quantidade inteira positiva.','erro');return;
   }
   if(btn){btn.disabled=true;btn.textContent='Registrando…';}
   try{
-    const rows=await sbSelect('estoques','material_id=eq.'+encodeURIComponent(matId));
-    if(rows?.length!==1)throw new Error('Estoque não encontrado ou ambíguo. Atualize a página.');
-    const est=rows[0],saldo=Number(est.quantidade_disponivel),cont=Number(est.quantidade_contratada);
-    if(!Number.isFinite(saldo)||!Number.isFinite(cont))throw new Error('Saldo inválido no banco.');
-    if(tipo==='saida'&&qtd>saldo)throw new Error('Estoque insuficiente. Disponível: '+saldo+'.');
-    const novoSaldo=saldo+(tipo==='entrada'?qtd:-qtd);
-    const novoCont=cont+(tipo==='entrada'?qtd:0);
-    // Compare-and-set: reject concurrent edits instead of overwriting another movement.
-    const updated=await sbFetch('estoques?id=eq.'+encodeURIComponent(est.id)+'&quantidade_disponivel=eq.'+saldo+'&quantidade_contratada=eq.'+cont,'PATCH',{
-      quantidade_disponivel:novoSaldo,quantidade_contratada:novoCont,updated_at:new Date().toISOString()
+    const res=await sbFetch('rpc/v19_movimentar_estoque','POST',{
+      p_material_id:matId,p_tipo:tipo,p_quantidade:qtd,p_observacao:null
     });
-    if(!Array.isArray(updated)||updated.length!==1)throw new Error('Movimentação não confirmada. Saldo alterado ou acesso negado; atualize a página.');
-    const m=getMats().find(m=>m.id===matId);
-    if(m){m.disp=novoSaldo;m.cont=novoCont;}
-    saveDB(DB);renderEstoqueGrid();fecharModalMov();
-    showToast('✅ Movimentação confirmada no banco.','ok');
-  }catch(e){showToast(escaparCidadeHTML(e.message||'Falha ao registrar movimentação.'),'erro');}
-  finally{if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
+    if(!res||typeof res.quantidade_disponivel!=='number'){
+      throw new Error('O banco não confirmou a movimentação.');
+    }
+    const mats=await sbGetMateriais();
+    if(!Array.isArray(mats))throw new Error('Movimentação gravada, mas não foi possível recarregar os saldos. Atualize a página.');
+    DB.materiais=mats;
+    renderEstoqueGrid();
+    fecharModalMov();
+    showToast('Movimentação e histórico registrados no banco.','ok');
+  }catch(e){
+    showToast('Falha na movimentação: '+String(e.message||e).replace(/[<>]/g,''),'erro');
+  }finally{if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
 }
 
 // ═══ RELATÓRIOS ═══
@@ -3823,6 +3812,7 @@ async function vEmpresas(b,t,a){
 
 let _empEditId=null;
 function abrirModalEmpresa(id){
+  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para editar empresas.','erro');return;}
   _empEditId=id;
   const overlay=document.getElementById('modal-emp-overlay');
   if(!overlay){ vEmpresas(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions')); return; }
@@ -3848,6 +3838,7 @@ function fecharModalEmpresa(){
   if(o) o.style.display='none'; document.body.style.overflow='';
 }
 async function salvarEmpresa(){
+  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para salvar empresas.','erro');return;}
   const empV=id=>document.getElementById(id)?.value||'';
   const nome=document.getElementById('emp-nome')?.value?.trim();
   const fb=document.getElementById('emp-feedback');
