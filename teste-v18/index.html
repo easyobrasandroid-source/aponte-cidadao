@@ -2497,7 +2497,7 @@ function fecharModalMov(){
   if(overlay) overlay.style.display='none';
   document.body.style.overflow='';
 }
-async async function salvarMovimentacao(){
+async function salvarMovimentacao(){
   if(!['master','consorcio'].includes(CU?.perfil)){
     showToast('Seu perfil não pode movimentar estoque manualmente.','erro');return;
   }
