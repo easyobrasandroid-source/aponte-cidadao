@@ -3733,10 +3733,23 @@ async function carregarEmpresas(){
 
 async function vEmpresas(b,t,a){
   t.textContent='Empresas executoras';
-  a.innerHTML=`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`;
+  // V19: administração exclusiva de master/consórcio; empresa vê só seus próprios dados.
+  const podeEditar=!!(CU&&['master','consorcio'].includes(CU.perfil));
+  if(!podeEditar && (!CU||CU.perfil!=='empresa')){
+    a.innerHTML=''; b.innerHTML='<div class="tcard" style="padding:2rem">Acesso restrito aos administradores.</div>'; return;
+  }
+  a.innerHTML=podeEditar?`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`:'';
   b.innerHTML='<div style="padding:2.5rem;text-align:center;color:var(--gray-400)">Carregando empresas do banco…</div>';
   let emps;
-  try{ emps=await carregarEmpresas(); }
+  try{
+    if(podeEditar) emps=await carregarEmpresas();
+    else {
+      if(!CU.empresa_id) throw new Error('Empresa não vinculada ao usuário.');
+      const rows=await sbSelect('empresas','select=*&id=eq.'+encodeURIComponent(CU.empresa_id)+'&limit=1');
+      if(rows===null) throw new Error('Falha ao consultar dados da própria empresa.');
+      emps=rows.map(mapEmpresa); DB.empresas=emps;
+    }
+  }
   catch(e){ b.innerHTML='<div class="tcard" style="padding:2.5rem;text-align:center;color:var(--red)">⚠ '+e.message+'<br><button class="btn btn-ghost" style="margin-top:12px" onclick="showView(\'empresas\')">↻ Tentar novamente</button></div>'; return; }
 
   function renderEmps(lista){
@@ -3753,7 +3766,7 @@ async function vEmpresas(b,t,a){
         <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="toggleEmpresa('${e.id}')" title="${e.status==='ativo'?'Desativar':'Ativar'}">${e.status==='ativo'?'⛔':'✅'}</button>
         <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="excluirEmpresa('${e.id}')" title="Excluir">🗑</button>
       </div></td>
-    </tr>`).join('');
+    </tr>`).map(html=>podeEditar?html:html.replace(/<td><div style="display:flex;gap:5px">[\s\S]*?<\/div><\/td>/,'<td><span style="color:var(--gray-400)">Somente leitura</span></td>')).join('');
   }
 
   b.innerHTML=`
@@ -3783,6 +3796,10 @@ async function vEmpresas(b,t,a){
     </div>
   </div>`;
 
+  if(!podeEditar){
+    const modal=document.getElementById('modal-emp-overlay'); if(modal)modal.remove();
+    const th=b.querySelector('thead th:last-child'); if(th)th.textContent='Permissão';
+  }
   window.filtrarEmpresas=function(){
     const busca=(document.getElementById('emp-busca')?.value||'').toLowerCase();
     const fst=document.getElementById('emp-fstatus')?.value||'';
@@ -3793,6 +3810,7 @@ async function vEmpresas(b,t,a){
     if(tb) tb.innerHTML=renderEmps(lista);
   };
   window.toggleEmpresa=async function(id){
+    if(!podeEditar) return;
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     const novo=e.status==='ativo'?'inativo':'ativo';
@@ -3803,6 +3821,7 @@ async function vEmpresas(b,t,a){
     showToast((novo==='ativo'?'✅ Empresa ativada':'⛔ Empresa desativada')+': '+e.nome,'ok');
   };
   window.excluirEmpresa=async function(id){
+    if(!podeEditar) return;
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     if(!confirm('Excluir a empresa "'+e.nome+'"?\nSe houver chamados vinculados, o banco vai recusar — nesse caso, desative em vez de excluir.')) return;
@@ -3815,6 +3834,7 @@ async function vEmpresas(b,t,a){
 
 let _empEditId=null;
 function abrirModalEmpresa(id){
+  if(!CU||!['master','consorcio'].includes(CU.perfil))return;
   _empEditId=id;
   const overlay=document.getElementById('modal-emp-overlay');
   if(!overlay){ vEmpresas(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions')); return; }
@@ -3840,6 +3860,7 @@ function fecharModalEmpresa(){
   if(o) o.style.display='none'; document.body.style.overflow='';
 }
 async function salvarEmpresa(){
+  if(!CU||!['master','consorcio'].includes(CU.perfil))return;
   const empV=id=>document.getElementById(id)?.value||'';
   const nome=document.getElementById('emp-nome')?.value?.trim();
   const fb=document.getElementById('emp-feedback');
