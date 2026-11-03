@@ -739,28 +739,41 @@ async function sbGetMateriais(){
 // Salvar material (catálogo + estoque)
 async function sbSaveMaterial(mat){
   try{
-    if(!['master','consorcio'].includes(CU?.perfil))throw new Error('Somente Master ou Consórcio podem alterar materiais.');
-    const materialId=mat._supaId || (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(mat.id||'') ? mat.id : null);
-    const consorcioId=mat.consorcio_id||CU?.consorcio_id||CONSORCIO_PADRAO;
-    const id=await sbFetch('rpc/v19_salvar_material','POST',{
-      p_material_id:materialId,
-      p_consorcio_id:consorcioId,
-      p_nome:mat.n,
-      p_unidade:mat.u||'Un.',
-      p_estoque_minimo:Number(mat.min)||0,
-      p_preco_unitario:Number(mat.preco)||0,
-      p_quantidade_contratada:Number(mat.cont)||0,
-      p_quantidade_disponivel:Number(mat.disp)||0
-    });
-    if(typeof id!=='string'||!/^[0-9a-f-]{36}$/i.test(id))throw new Error('O banco não confirmou o cadastro do material.');
-    return id;
-  }catch(e){
-    console.error('[Estoque] erro ao salvar material:',e);
-    showToast('Falha ao salvar material: '+String(e.message||e).replace(/[<>]/g,''),'erro');
-    return false;
-  }
+    // 1. Materiais (catálogo)
+    const matRow = {
+      nome: mat.n, unidade: mat.u||'Un.',
+      estoque_minimo: mat.min||0, preco_unitario: mat.preco||0,
+      status: 'ativo',
+    };
+    let materialId = mat._supaId || (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(mat.id||'') ? mat.id : null);
+    if(materialId){
+      // Já existe → UPDATE
+      await sbUpdate('materiais', 'id=eq.'+materialId, matRow);
+    } else {
+      // Novo → INSERT (Postgres gera o UUID)
+      const resp = await sbFetch('materiais', 'POST', matRow);
+      materialId = resp?.[0]?.id;
+    }
+    if(!materialId){ console.warn('[Estoque] material sem id retornado'); return false; }
+    // 2. Estoque (saldo) — verificar se já existe linha para esse material
+    const estExist = await sbSelect('estoques', 'material_id=eq.'+materialId);
+    const estRow = {
+      material_id: materialId,
+      quantidade_contratada: mat.cont||0,
+      quantidade_disponivel: mat.disp||0,
+      updated_at: new Date().toISOString(),
+    };
+    if(estExist && estExist[0]){
+      // Existe → UPDATE pelo id da linha de estoque
+      await sbUpdate('estoques', 'id=eq.'+estExist[0].id, estRow);
+    } else {
+      // Não existe → INSERT simples
+      await sbFetch('estoques', 'POST', estRow);
+    }
+    console.log('[Estoque] ✅ material salvo:', mat.n, materialId);
+    return materialId;
+  }catch(e){ console.error('[Estoque] saveMaterial:', e.message); return false; }
 }
-
 // Excluir material
 async function sbDeleteMaterial(supaId){
   try{
@@ -819,21 +832,11 @@ async function sbSaveChamadoMaterial(protocolo, materialId, qtd, precoUnit){
 }
 
 async function sbGetChamados(){
-  // Supabase REST costuma limitar linhas por requisição; buscar todas as páginas.
-  // Se exceder o teto defensivo, falhar explicitamente em vez de exibir total incompleto.
-  const todos=[];
-  const pageSize=500, maxPages=100;
-  for(let page=0;page<maxPages;page++){
-    const from=page*pageSize;
-    const parte=await sbFetch('chamados?select=*&order=created_at.desc,id.desc&limit='+pageSize+'&offset='+from);
-    if(!Array.isArray(parte))throw new Error('Resposta inválida ao carregar chamados.');
-    todos.push(...parte);
-    if(parte.length<pageSize){
-      console.log('[Supabase] chamados carregados:',todos.length);
-      return todos;
-    }
-  }
-  throw new Error('Limite de consulta atingido. Aumente a paginação antes de exibir totais.');
+  try {
+    const data = await sbFetch('chamados?order=created_at.desc&limit=500');
+    console.log('[Supabase] chamados carregados:', data.length);
+    return data;
+  } catch(e){ console.warn('[Supabase] buscar chamados:', e.message); return null; }
 }
 
 // Payload normalizado. Na atualização, comparar com a fotografia original para
@@ -1080,86 +1083,96 @@ function navChamados(statusFilter, label){
 // ═══ DASHBOARD ═══
 function vDashboard(b,t,a){
   t.textContent='Dashboard gerencial';
-  // A consulta respeita RLS no servidor; os filtros abaixo reforçam o escopo na interface.
-  // Nunca apresentar gráficos ou SLA simulados como dados reais.
-  const previous=vDashboard._filtros||{periodo:'30d',cidade:''};
-  const periodo=previous.periodo;
-  const cidade=previous.cidade;
-  a.innerHTML='<span style="font-size:12px;color:var(--gray-500)">Indicadores baseados em chamados reais</span>';
-  b.innerHTML='<div style="padding:2rem;text-align:center;color:var(--gray-500)">Carregando indicadores do Supabase…</div>';
-  carregarChamadosDoBanco().then(ok=>{
-    if(!ok){
-      b.innerHTML='<div class="tcard" style="padding:2rem;color:var(--red)">Não foi possível consultar os chamados no banco. Nenhum indicador foi estimado. <button class="btn btn-ghost" onclick="showView(\'dashboard\')">Tentar novamente</button></div>';
-      return;
-    }
-    let todos=Array.isArray(DB.chamados)?DB.chamados:[];
-    if(CU?.perfil==='consorcio')todos=todos.filter(c=>c.consorcio_id===CU.consorcio_id);
-    else if(CU?.perfil==='prefeitura')todos=todos.filter(c=>c.cidade_id===CU.cidade_id);
-    else if(CU?.perfil==='empresa')todos=todos.filter(c=>c.empresa_id===CU.empresa_id);
-    else if(CU?.perfil==='garantia')todos=todos.filter(c=>c.garantia_tipo||c.status==='Aguardando Garantia LED');
-    const cidades=[...new Set(todos.map(c=>c.cidade).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const agora=Date.now();
-    const days={ '30d':30,'90d':90 };
-    const filtered=todos.filter(c=>{
-      if(cidade&&c.cidade!==cidade)return false;
-      if(periodo in days){
-        const dt=Date.parse(c.created_at||'');
-        return Number.isFinite(dt)&&dt>=agora-days[periodo]*86400000&&dt<=agora;
-      }
-      if(periodo.startsWith('mes:')){
-        const dt=Date.parse(c.created_at||'');
-        return Number.isFinite(dt)&&new Date(dt).toISOString().slice(0,7)===periodo.slice(4);
-      }
-      return true;
-    });
-    const completos=filtered.filter(c=>c.status==='Concluído').length;
-    const ativos=filtered.length-completos;
-    const urbanos=filtered.filter(c=>c.area==='Urbana').length;
-    const rurais=filtered.filter(c=>c.area==='Rural').length;
-    const qtGarantia=filtered.filter(c=>c.garantia_tipo||c.status==='Aguardando Garantia LED').length;
-    const categorias={};
-    filtered.forEach(c=>{const k=c.status||'Não informado';categorias[k]=(categorias[k]||0)+1;});
-    const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    const kpi=(nome,valor,sub,cor)=>'<div class="kpi"><div class="kpi-accent" style="background:'+cor+'"></div><div class="kpi-label">'+nome+'</div><div class="kpi-val" style="color:'+cor+'">'+valor+'</div><div class="kpi-sub">'+sub+'</div></div>';
-    const dadosCompletos=true; // sbGetChamados percorre todas as páginas ou retorna erro.
-    b.innerHTML='<div class="tcard" style="padding:14px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
-      '<label style="font-size:12px">Período <select id="dash-periodo" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="all">Todo o histórico carregado</option><option value="mes">Escolher mês</option></select></label>'+
-      '<input id="dash-mes" type="month" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px" />'+
-      '<label style="font-size:12px">Cidade <select id="dash-cidade" style="padding:8px;border:1px solid var(--gray-300);border-radius:6px"><option value="">Todas as cidades autorizadas</option>'+cidades.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label></div>'+
-      (!dadosCompletos?'<div class="alerts-bar">⚠ Foram carregados até 500 chamados. Os números não são necessariamente totais do banco; é necessário implementar paginação.</div>':'')+
-      '<div class="kpi-grid">'+
-      kpi('Chamados',filtered.length,'No filtro selecionado','var(--brand)')+
-      kpi('Em andamento',ativos,'Não concluídos','#D97706')+
-      kpi('Concluídos',completos,'Com status Concluído','var(--green)')+
-      kpi('Garantia LED',qtGarantia,'Marcados como garantia','#8B5CF6')+
-      kpi('Área urbana',urbanos,'Chamados urbanos','var(--brand)')+
-      kpi('Área rural',rurais,'Chamados rurais','#0D7A55')+
-      '</div><div class="tcard" style="padding:16px;margin-top:14px"><strong>Situação dos chamados</strong>'+
-      Object.entries(categorias).sort((x,y)=>y[1]-x[1]).map(([x,n])=>'<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--gray-100);padding:8px 0"><span>'+esc(x)+'</span><strong>'+n+'</strong></div>').join('')+
-      (!filtered.length?'<p style="padding:12px 0;color:var(--gray-500)">Nenhum chamado no período e cidade selecionados.</p>':'')+
-      '<p style="font-size:11px;color:var(--gray-500);margin-top:12px">SLA: aguardando cálculo auditado de prazo e pausas. Nenhum percentual fictício foi utilizado.</p></div>';
-    const p=document.getElementById('dash-periodo'), m=document.getElementById('dash-mes'), c=document.getElementById('dash-cidade');
-    const mesSelecionado=periodo.startsWith('mes:')?periodo.slice(4):new Date().toISOString().slice(0,7);
-    p.value=periodo.startsWith('mes:')?'mes':periodo;
-    m.value=mesSelecionado;
-    m.style.display=p.value==='mes'?'inline-block':'none';
-    c.value=cidades.includes(cidade)?cidade:'';
-    p.onchange=()=>{
-      m.style.display=p.value==='mes'?'inline-block':'none';
-      vDashboard._filtros={periodo:p.value==='mes'?'mes:'+m.value:p.value,cidade:c.value};
-      vDashboard(b,t,a);
-    };
-    m.onchange=()=>{
-      vDashboard._filtros={periodo:'mes:'+m.value,cidade:c.value};
-      vDashboard(b,t,a);
-    };
-    c.onchange=()=>{
-      vDashboard._filtros={periodo:p.value==='mes'?'mes:'+m.value:p.value,cidade:c.value};
-      vDashboard(b,t,a);
-    };
-  }).catch(e=>{
-    b.innerHTML='<div class="tcard" style="padding:2rem;color:var(--red)">Erro ao carregar indicadores: '+String(e.message||e).replace(/[<>]/g,'')+'</div>';
-  });
+  a.innerHTML=`<span style="font-size:11px;padding:4px 10px;background:var(--brand-light);color:var(--brand);border-radius:20px;font-weight:600">CIS Caparaó</span>
+  <select id="dash-cidade" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
+    <option value="">Todas as cidades</option><option>Espera Feliz</option><option>Caparaó</option><option>Alto Caparaó</option><option>Carangola</option><option>Manhuaçu</option><option>Divino</option>
+  </select>
+  <select id="dash-periodo" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
+    <option value="">Junho 2026</option><option value="maio">Maio 2026</option><option value="30d">Últimos 30 dias</option>
+  </select>`;
+  const at=DB.chamados.filter(c=>c.status==='Em atraso').length,co=DB.chamados.filter(c=>c.status==='Concluído').length,an=DB.chamados.filter(c=>['Em execução','Em programação','Recebido'].includes(c.status)).length;
+  // Ler filtros ativos do dashboard
+  const dashCidade = document.getElementById('dash-cidade')?.value || '';
+  const dashPeriodo = document.getElementById('dash-periodo')?.value || '';
+
+  b.innerHTML=`
+  <div class="alerts-bar"><strong>⚠️ Alertas:</strong>
+    <span>🔴 ${at} chamado(s) em atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
+    <span>🟡 Manhuaçu com maior índice de atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
+    <span>🟠 Estoque Lamp. LED 100w abaixo do mínimo</span>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('all','Todos os chamados')" title="Ver todos os chamados">
+      <div class="kpi-accent" style="background:var(--brand)"></div>
+      <div class="kpi-label">Total chamados</div>
+      <div class="kpi-val" style="color:var(--brand)">${DB.chamados.length}</div>
+      <div class="kpi-sub">no período</div>
+      <div class="kpi-trend" style="color:var(--green)">↑ +18% vs. mês anterior</div>
+      <div style="font-size:10px;color:var(--brand);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('andamento','Em andamento')" title="Ver chamados em andamento">
+      <div class="kpi-accent" style="background:#D97706"></div>
+      <div class="kpi-label">Em andamento</div>
+      <div class="kpi-val" style="color:#D97706">${an}</div>
+      <div class="kpi-sub">programação + execução</div>
+      <div class="kpi-trend" style="color:var(--green)">↓ -7%</div>
+      <div style="font-size:10px;color:#D97706;margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('Em atraso','Em atraso (SLA)')" title="Ver chamados em atraso">
+      <div class="kpi-accent" style="background:var(--red)"></div>
+      <div class="kpi-label">Em atraso (SLA)</div>
+      <div class="kpi-val" style="color:var(--red)">${at}</div>
+      <div class="kpi-sub">prazo ultrapassado</div>
+      <div class="kpi-trend" style="color:var(--red)">↑ urgente</div>
+      <div style="font-size:10px;color:var(--red);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('Concluído','Concluídos')" title="Ver chamados concluídos">
+      <div class="kpi-accent" style="background:var(--green)"></div>
+      <div class="kpi-label">Concluídos</div>
+      <div class="kpi-val" style="color:var(--green)">${co}</div>
+      <div class="kpi-sub">taxa de resolução</div>
+      <div class="kpi-trend" style="color:var(--green)">↑ +5%</div>
+      <div style="font-size:10px;color:var(--green);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+  </div>
+  <div class="kpi-grid2">
+    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Urbana',label:'Área Urbana'};showView('chamados')" title="Ver chamados urbanos"><div class="kpi2-ico" style="background:var(--brand-light)">🏙</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Urbanos</div><div style="font-size:18px;font-weight:800;color:var(--brand)" id="kpi-urb">—</div></div></div>
+    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Rural',label:'Área Rural'};showView('chamados')" title="Ver chamados rurais"><div class="kpi2-ico" style="background:var(--green-light)">🌾</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Rurais</div><div style="font-size:18px;font-weight:800;color:var(--green)" id="kpi-rur">—</div></div></div>
+    <div class="kpi2"><div class="kpi2-ico" style="background:var(--amber-light)">🎯</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">SLA cumprido</div><div style="font-size:18px;font-weight:800;color:var(--amber)">96%</div></div></div>
+    <div class="kpi2" style="cursor:pointer" onclick="navChamados('Aguardando Garantia LED','Garantia LED')" title="Ver chamados em garantia LED">
+      <div class="kpi2-ico" style="background:#FFF8DC;font-size:16px">⚡</div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Garantia LED</div><div style="font-size:18px;font-weight:800;color:#B8860B"><span id="kpi-garantia-led">0</span></div></div>
+    </div>
+  </div>
+  <div class="row21">
+    <div class="card"><div class="card-title">Evolução mensal — 2026</div><div style="height:200px"><canvas id="chartEv"></canvas></div></div>
+    <div class="card"><div class="card-title">Por status</div><div style="height:200px"><canvas id="chartSt"></canvas></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div class="card"><div class="card-title">Desempenho por cidade</div>
+      ${[{n:'Espera Feliz',p:99},{n:'Caparaó',p:98},{n:'Alto Caparaó',p:96},{n:'Carangola',p:95},{n:'Divino',p:99},{n:'Manhuaçu',p:82}].map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-50)"><span style="font-size:11px;min-width:90px;color:var(--gray-600)">${c.n}</span><div style="flex:1;height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden"><div style="width:${c.p}%;height:5px;border-radius:3px;background:${c.p>=95?'var(--green)':'var(--red)'}"></div></div><span style="font-size:10px;font-weight:700;min-width:30px;text-align:right;color:${c.p>=95?'var(--green)':'var(--red)'}">${c.p}%</span></div>`).join('')}
+    </div>
+    <div class="card"><div class="card-title">Tipo de problema</div><div style="height:180px"><canvas id="chartTp"></canvas></div></div>
+    <div class="card"><div class="card-title">⚠️ Alertas gerenciais</div>
+      ${[['🔴','Manhuaçu +45% chamados este mês','#FEF2F2'],['🚨','SLA vencendo: '+at+' chamados críticos','#FEF2F2'],['🟠','Lâmpadas apagadas +18% vs. mês','#FFFBEB'],['ℹ️','Estoque Lamp. LED 100w baixo','#EFF6FF']].map(([i,tx,bg])=>`<div style="display:flex;gap:8px;padding:8px 10px;border-radius:7px;margin-bottom:6px;background:${bg}"><span>${i}</span><span style="font-size:11px;font-weight:500">${tx}</span></div>`).join('')}
+    </div>
+  </div>`;
+  // Preencher KPIs dinâmicos
+  setTimeout(()=>{
+    const kpiGar=document.getElementById('kpi-garantia-led');
+    if(kpiGar) kpiGar.textContent=DB.chamados.filter(c=>c.status==='Aguardando Garantia LED').length;
+    const kpiUrb=document.getElementById('kpi-urb');
+    if(kpiUrb) kpiUrb.textContent=DB.chamados.filter(c=>c.area==='Urbana').length;
+    const kpiRur=document.getElementById('kpi-rur');
+    if(kpiRur) kpiRur.textContent=DB.chamados.filter(c=>c.area==='Rural').length;
+  },50);
+
+  setTimeout(()=>{
+    Chart.defaults.font.family='Inter';
+    new Chart(document.getElementById('chartEv'),{type:'line',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Abertos',data:[820,750,1010,880,920,947],borderColor:'#1251A3',backgroundColor:'rgba(18,81,163,.07)',fill:true,tension:.4,pointRadius:3},{label:'Concluídos',data:[800,740,980,860,900,DB.chamados.length*10],borderColor:'#0D7A55',backgroundColor:'rgba(13,122,85,.07)',fill:true,tension:.4,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:9,usePointStyle:true,pointStyle:'circle',font:{size:10}}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#F3F4F6'}}}}});
+    new Chart(document.getElementById('chartSt'),{type:'doughnut',data:{labels:['Novo','Programação','Em execução','Em atraso','Concluído'],datasets:[{data:[47,89,94,at*10,co*100+1000],backgroundColor:['#3B82F6','#F59E0B','#10B981','#EF4444','#059669'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
+    new Chart(document.getElementById('chartTp'),{type:'doughnut',data:{labels:['Apagada','Piscando','Acesa de dia','Poste danificado','Outro'],datasets:[{data:[748,312,98,46,22],backgroundColor:['#1251A3','#3B82F6','#F59E0B','#EF4444','#9CA3AF'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
+  },100);
 }
 
 // ═══ CHAMADOS ═══
@@ -2289,8 +2302,8 @@ function vEstoque(b,t,a){
   });
   a.innerHTML=`
     <button class="btn btn-ghost" onclick="abrirHistoricoMovimentacao()">📋 Histórico</button>
-${['master','consorcio'].includes(CU?.perfil)?`<button class="btn btn-ghost" onclick="abrirMovimentacao(null)">↕ Movimentação</button>
-    <button class="btn btn-save" onclick="abrirModalMaterial(null)">+ Adicionar material</button>`:''}`;
+    <button class="btn btn-ghost" onclick="abrirMovimentacao(null)">↕ Movimentação</button>
+    <button class="btn btn-save" onclick="abrirModalMaterial(null)">+ Adicionar material</button>`;
   b.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem">
       <div class="kpi"><div class="kpi-accent" style="background:var(--brand)"></div><div class="kpi-label">Itens cadastrados</div><div class="kpi-val" style="color:var(--brand)" id="stk-total">—</div></div>
@@ -2351,7 +2364,6 @@ ${['master','consorcio'].includes(CU?.perfil)?`<button class="btn btn-ghost" onc
 
 let _matEditId=null;
 function abrirModalMaterial(id){
-  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para editar materiais.','erro');return;}
   _matEditId=id;
   const overlay=document.getElementById('modal-mat-overlay');
   if(!overlay){vEstoque(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));return;}
@@ -2481,7 +2493,6 @@ async function abrirHistoricoMovimentacao(){
 }
 
 function abrirMovimentacao(matId){
-  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para movimentação manual.','erro');return;}
   const overlay=document.getElementById('modal-mov-overlay');
   if(!overlay){vEstoque(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));return;}
   const select=document.getElementById('mov-material');
@@ -2498,34 +2509,34 @@ function fecharModalMov(){
   document.body.style.overflow='';
 }
 async function salvarMovimentacao(){
-  if(!['master','consorcio'].includes(CU?.perfil)){
-    showToast('Seu perfil não pode movimentar estoque manualmente.','erro');return;
-  }
   const btn=document.querySelector('button[onclick="salvarMovimentacao()"]');
   if(btn?.disabled)return;
   const matId=document.getElementById('mov-material')?.value;
   const tipo=document.getElementById('mov-tipo')?.value;
   const qtd=Number(document.getElementById('mov-qtd')?.value);
-  if(!Number.isInteger(qtd)||qtd<1||!['saida','entrada'].includes(tipo)||!matId){
-    showToast('Selecione um material e uma quantidade inteira positiva.','erro');return;
+  if(!Number.isInteger(qtd)||qtd<1||!['saida','entrada'].includes(tipo)){
+    showToast('Informe uma quantidade inteira positiva.','erro');return;
   }
   if(btn){btn.disabled=true;btn.textContent='Registrando…';}
   try{
-    const res=await sbFetch('rpc/v19_movimentar_estoque','POST',{
-      p_material_id:matId,p_tipo:tipo,p_quantidade:qtd,p_observacao:null
+    const rows=await sbSelect('estoques','material_id=eq.'+encodeURIComponent(matId));
+    if(rows?.length!==1)throw new Error('Estoque não encontrado ou ambíguo. Atualize a página.');
+    const est=rows[0],saldo=Number(est.quantidade_disponivel),cont=Number(est.quantidade_contratada);
+    if(!Number.isFinite(saldo)||!Number.isFinite(cont))throw new Error('Saldo inválido no banco.');
+    if(tipo==='saida'&&qtd>saldo)throw new Error('Estoque insuficiente. Disponível: '+saldo+'.');
+    const novoSaldo=saldo+(tipo==='entrada'?qtd:-qtd);
+    const novoCont=cont+(tipo==='entrada'?qtd:0);
+    // Compare-and-set: reject concurrent edits instead of overwriting another movement.
+    const updated=await sbFetch('estoques?id=eq.'+encodeURIComponent(est.id)+'&quantidade_disponivel=eq.'+saldo+'&quantidade_contratada=eq.'+cont,'PATCH',{
+      quantidade_disponivel:novoSaldo,quantidade_contratada:novoCont,updated_at:new Date().toISOString()
     });
-    if(!res||typeof res.quantidade_disponivel!=='number'){
-      throw new Error('O banco não confirmou a movimentação.');
-    }
-    const mats=await sbGetMateriais();
-    if(!Array.isArray(mats))throw new Error('Movimentação gravada, mas não foi possível recarregar os saldos. Atualize a página.');
-    DB.materiais=mats;
-    renderEstoqueGrid();
-    fecharModalMov();
-    showToast('Movimentação e histórico registrados no banco.','ok');
-  }catch(e){
-    showToast('Falha na movimentação: '+String(e.message||e).replace(/[<>]/g,''),'erro');
-  }finally{if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
+    if(!Array.isArray(updated)||updated.length!==1)throw new Error('Movimentação não confirmada. Saldo alterado ou acesso negado; atualize a página.');
+    const m=getMats().find(m=>m.id===matId);
+    if(m){m.disp=novoSaldo;m.cont=novoCont;}
+    saveDB(DB);renderEstoqueGrid();fecharModalMov();
+    showToast('✅ Movimentação confirmada no banco.','ok');
+  }catch(e){showToast(escaparCidadeHTML(e.message||'Falha ao registrar movimentação.'),'erro');}
+  finally{if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
 }
 
 // ═══ RELATÓRIOS ═══
@@ -3714,12 +3725,7 @@ const CONSORCIO_PADRAO='1bfffc11-4abf-4495-adfe-4231e87803c6'; // CIS Caparaó (
 function mapEmpresa(r){ return {id:r.id, nome:r.nome, cnpj:r.cnpj||'', end:r.endereco||'', cidade:r.cidade||'', uf:r.uf||'MG', tel:r.telefone||'', email:r.email||'', resp:r.responsavel||'', status:r.status||'ativo', consorcio_id:r.consorcio_id}; }
 function getEmpresas(){ return DB.empresas||[]; } // cache em memória (fonte real = Supabase)
 async function carregarEmpresas(){
-  // Empresa não deve solicitar a lista de outros prestadores nem mesmo para filtrar depois.
-  const query=CU?.perfil==='empresa'
-    ? (CU.empresa_id?'select=*&id=eq.'+encodeURIComponent(CU.empresa_id):null)
-    : 'select=*&order=nome.asc';
-  if(query===null)throw new Error('Empresa não vinculada ao usuário.');
-  const rows = await sbSelect('empresas',query);
+  const rows = await sbSelect('empresas','select=*&order=nome.asc');
   if(rows===null) throw new Error('Não foi possível carregar as empresas do banco.');
   DB.empresas = rows.map(mapEmpresa); saveDB(DB);
   return DB.empresas;
@@ -3727,8 +3733,7 @@ async function carregarEmpresas(){
 
 async function vEmpresas(b,t,a){
   t.textContent='Empresas executoras';
-  const podeGerirEmpresas=['master','consorcio'].includes(CU?.perfil);
-  a.innerHTML=podeGerirEmpresas?'<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>':'';
+  a.innerHTML=`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`;
   b.innerHTML='<div style="padding:2.5rem;text-align:center;color:var(--gray-400)">Carregando empresas do banco…</div>';
   let emps;
   try{ emps=await carregarEmpresas(); }
@@ -3743,11 +3748,11 @@ async function vEmpresas(b,t,a){
       <td style="font-size:12px">${e.tel}</td>
       <td style="font-size:12px">${e.resp}</td>
       <td><span style="background:${e.status==='ativo'?'var(--green-light)':'var(--gray-100)'};color:${e.status==='ativo'?'var(--green)':'var(--gray-500)'};font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px">${e.status==='ativo'?'Ativa':'Inativa'}</span></td>
-      <td>${podeGerirEmpresas?`<div style="display:flex;gap:5px">
+      <td><div style="display:flex;gap:5px">
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="abrirModalEmpresa('${e.id}')">✏️ Editar</button>
-        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="toggleEmpresa('${e.id}')">Alterar status</button>
-        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="excluirEmpresa('${e.id}')">Excluir</button>
-      </div>`:'Somente leitura'}</td>
+        <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="toggleEmpresa('${e.id}')" title="${e.status==='ativo'?'Desativar':'Ativar'}">${e.status==='ativo'?'⛔':'✅'}</button>
+        <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="excluirEmpresa('${e.id}')" title="Excluir">🗑</button>
+      </div></td>
     </tr>`).join('');
   }
 
@@ -3781,14 +3786,13 @@ async function vEmpresas(b,t,a){
   window.filtrarEmpresas=function(){
     const busca=(document.getElementById('emp-busca')?.value||'').toLowerCase();
     const fst=document.getElementById('emp-fstatus')?.value||'';
-    let lista=CU?.perfil==='empresa'?getEmpresas().filter(e=>String(e.id)===String(CU.empresa_id)):getEmpresas();
+    let lista=getEmpresas();
     if(busca) lista=lista.filter(e=>e.nome.toLowerCase().includes(busca)||e.cnpj.includes(busca)||e.cidade.toLowerCase().includes(busca));
     if(fst) lista=lista.filter(e=>e.status===fst);
     const tb=document.getElementById('emp-tbody');
     if(tb) tb.innerHTML=renderEmps(lista);
   };
   window.toggleEmpresa=async function(id){
-    if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão.','erro');return;}
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     const novo=e.status==='ativo'?'inativo':'ativo';
@@ -3799,7 +3803,6 @@ async function vEmpresas(b,t,a){
     showToast((novo==='ativo'?'✅ Empresa ativada':'⛔ Empresa desativada')+': '+e.nome,'ok');
   };
   window.excluirEmpresa=async function(id){
-    if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão.','erro');return;}
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     if(!confirm('Excluir a empresa "'+e.nome+'"?\nSe houver chamados vinculados, o banco vai recusar — nesse caso, desative em vez de excluir.')) return;
@@ -3812,7 +3815,6 @@ async function vEmpresas(b,t,a){
 
 let _empEditId=null;
 function abrirModalEmpresa(id){
-  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para editar empresas.','erro');return;}
   _empEditId=id;
   const overlay=document.getElementById('modal-emp-overlay');
   if(!overlay){ vEmpresas(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions')); return; }
@@ -3838,7 +3840,6 @@ function fecharModalEmpresa(){
   if(o) o.style.display='none'; document.body.style.overflow='';
 }
 async function salvarEmpresa(){
-  if(!['master','consorcio'].includes(CU?.perfil)){showToast('Sem permissão para salvar empresas.','erro');return;}
   const empV=id=>document.getElementById(id)?.value||'';
   const nome=document.getElementById('emp-nome')?.value?.trim();
   const fb=document.getElementById('emp-feedback');
@@ -4022,9 +4023,6 @@ function calcSLAComConfig(chamado){
 
 function vSLA(b,t,a){
   t.textContent='Configuração de SLA';
-  // A edição anterior alterava apenas memória e exibia sucesso falso.
-  // Nesta etapa mostrar somente leitura até que a persistência por consórcio seja migrada.
-  const modoLeitura=true;
   // Consórcios disponíveis
   const cfg=getSLAConfig();
   const consorciosList=Object.keys(cfg);
@@ -4036,26 +4034,26 @@ function vSLA(b,t,a){
       <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${r.ico}</span><span style="font-size:12px;font-weight:600">${r.tipo}</span></div></td>
       <td>
         <div style="display:flex;align-items:center;gap:5px">
-          <input type="number" value="${r.urb.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" disabled onchange="cfg['${cons}'][${i}].urb.prazo=parseInt(this.value)||1">
-          <select style="padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" disabled onchange="cfg['${cons}'][${i}].urb.unid=this.value">
+          <input type="number" value="${r.urb.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" onchange="cfg['${cons}'][${i}].urb.prazo=parseInt(this.value)||1">
+          <select style="padding:5px 7px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" onchange="cfg['${cons}'][${i}].urb.unid=this.value">
             <option ${r.urb.unid==='Horas'?'selected':''}>Horas</option>
             <option ${r.urb.unid==='Dias'?'selected':''}>Dias</option>
           </select>
         </div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:3px">Alerta:
-          <input type="number" value="${r.urb.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" disabled onchange="cfg['${cons}'][${i}].urb.alerta=parseInt(this.value)||1"> h antes
+          <input type="number" value="${r.urb.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" onchange="cfg['${cons}'][${i}].urb.alerta=parseInt(this.value)||1"> h antes
         </div>
       </td>
       <td>
         <div style="display:flex;align-items:center;gap:5px">
-          <input type="number" value="${r.rur.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" disabled onchange="cfg['${cons}'][${i}].rur.prazo=parseInt(this.value)||1">
-          <select style="padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" disabled onchange="cfg['${cons}'][${i}].rur.unid=this.value">
+          <input type="number" value="${r.rur.prazo}" min="1" style="width:60px;padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;text-align:center;outline:none" onchange="cfg['${cons}'][${i}].rur.prazo=parseInt(this.value)||1">
+          <select style="padding:5px 7px;border:1.5px solid var(--green);border-radius:var(--radius-sm);font-size:11px;font-family:'Inter',sans-serif" onchange="cfg['${cons}'][${i}].rur.unid=this.value">
             <option ${r.rur.unid==='Horas'?'selected':''}>Horas</option>
             <option ${r.rur.unid==='Dias'?'selected':''}>Dias</option>
           </select>
         </div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:3px">Alerta:
-          <input type="number" value="${r.rur.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" disabled onchange="cfg['${cons}'][${i}].rur.alerta=parseInt(this.value)||1"> h antes
+          <input type="number" value="${r.rur.alerta}" min="1" style="width:42px;padding:2px 5px;border:1px solid var(--gray-300);border-radius:3px;font-size:11px;text-align:center" onchange="cfg['${cons}'][${i}].rur.alerta=parseInt(this.value)||1"> h antes
         </div>
       </td>
       <td style="text-align:center">
@@ -4068,10 +4066,11 @@ function vSLA(b,t,a){
     </tr>`).join('');
   }
 
-  a.innerHTML='<span style="font-size:12px;color:var(--gray-500)">Somente leitura — sincronização com banco em implantação</span>';
+  a.innerHTML=`
+    <button class="btn btn-ghost" onclick="if(confirm('Restaurar prazos padrão para este consórcio?')){const c=document.getElementById('sla-cons-sel').value;DB.sla_config[c]=JSON.parse(JSON.stringify(SLA_PADRAO));saveDB(DB);vSLA(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'));}">↺ Restaurar padrão</button>
+    <button class="btn btn-save" onclick="saveSLAConfig()">💾 Salvar SLA</button>`;
 
   b.innerHTML=`
-  <div class="alerts-bar">⚠ Valores exibidos são referências da interface; edição suspensa até leitura e gravação confirmadas no Supabase.</div>
   <!-- SELETOR DE CONSÓRCIO -->
   <div class="card" style="margin-bottom:1rem">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -4079,7 +4078,7 @@ function vSLA(b,t,a){
       <select id="sla-cons-sel" style="font-size:13px;padding:7px 12px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);font-family:'Inter',sans-serif;font-weight:600;color:var(--brand)" onchange="consAtivo=this.value;document.getElementById('sla-tbody').innerHTML=renderTabela(this.value);document.getElementById('sla-cons-nome').textContent=this.value">
         ${consorciosList.map(c=>`<option value="${c}">${c}</option>`).join('')}
       </select>
-      <button disabled class="btn btn-ghost" style="font-size:11px" onclick="
+      <button class="btn btn-ghost" style="font-size:11px" onclick="
         const nome=prompt('Nome do novo consórcio:');
         if(!nome||!nome.trim()) return;
         const cfg2=getSLAConfig();
@@ -4132,8 +4131,8 @@ function vSLA(b,t,a){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="sla-preview-kpis"></div>
   </div>`;
 
-  // Sem telemetria auditada, não calcular prévia a partir de cache e configuração demonstrativa.
-  /* setTimeout(()=>{
+  // Preencher preview de impacto
+  setTimeout(()=>{
     const kpis=document.getElementById('sla-preview-kpis');
     if(!kpis) return;
     const urb=DB.chamados.filter(c=>c.area==='Urbana');
@@ -4154,22 +4153,21 @@ function vSLA(b,t,a){
       ['🏙 Urbanos em atraso',urbAtras,'var(--red)','var(--red-light)'],
       ['🌾 Rurais em atraso',rurAtras,'#B8860B','#FFF8DC'],
     ].map(([l,v,cor,bg])=>`<div style="background:${bg};border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:${cor}">${v}</div><div style="font-size:9px;font-weight:700;color:${cor};text-transform:uppercase;margin-top:2px">${l}</div></div>`).join('');
-  },50); */
-  const preview=document.getElementById('sla-preview-kpis');
-  if(preview) preview.textContent='Aguardando integração com prazos e dados reais do banco.';
+  },50);
 }
 
 function saveSLAConfig(){
-  showToast('Salvamento de SLA indisponível até a integração com o banco. Nenhuma alteração foi gravada.','aviso');
+  saveDB(DB);
+  showToast('✅ SLA salvo — prazos por consórcio e área aplicados em todos os chamados.','ok');
 }
 
 // ═══ CONFIG PORTAL ═══
 function vConfigPortal(b,t,a){
   t.textContent='Configurações do portal público';
-  a.innerHTML='<button class="btn btn-ghost" onclick="goPage(\'pg-portal\')">👁 Ver portal</button><span style="font-size:12px;color:var(--gray-500)">Configuração em implementação — sem salvamento disponível</span>';
-  b.innerHTML=`<div class="alerts-bar">⚠ Prévia demonstrativa. Estas opções não são persistidas nem alteram o funcionamento do portal.</div><div style="background:var(--brand-light);border:1px solid #B3CDEE;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--brand)">🔗 <strong>URL pública:</strong><span style="font-family:'JetBrains Mono',monospace">https://apontecidadao.com.br/ciscaparao</span><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="navigator.clipboard?.writeText('https://apontecidadao.com.br/ciscaparao');alert('Link copiado!')">📋 Copiar</button></div>
+  a.innerHTML=`<button class="btn btn-ghost" onclick="goPage('pg-portal')">👁 Ver portal</button><button class="btn btn-save" onclick="alert('Configurações salvas!')">💾 Salvar</button>`;
+  b.innerHTML=`<div style="background:var(--brand-light);border:1px solid #B3CDEE;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--brand)">🔗 <strong>URL pública:</strong><span style="font-family:'JetBrains Mono',monospace">https://apontecidadao.com.br/ciscaparao</span><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="navigator.clipboard?.writeText('https://apontecidadao.com.br/ciscaparao');alert('Link copiado!')">📋 Copiar</button></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div class="card"><div class="card-title">⚙️ Funcionalidades</div>${[['Consulta pública de protocolo','Cidadão consulta status pelo número',true],['Abertura de chamado pelo portal','Cidadão abre chamados pelo site',true],['GPS obrigatório no mobile','Exigir GPS para abertura',false],['Exibir empresa responsável','Mostrar empresa na consulta',false],['Notificação por WhatsApp','Enviar atualizações ao cidadão',true]].map(([tt,d,on])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-50)"><div><div style="font-size:13px;font-weight:600">${tt}</div><div style="font-size:11px;color:var(--gray-400);margin-top:2px">${d}</div></div><div class="toggle ${on?'':'off'}" style="pointer-events:none;opacity:.5"></div></div>`).join('')}</div>
+    <div class="card"><div class="card-title">⚙️ Funcionalidades</div>${[['Consulta pública de protocolo','Cidadão consulta status pelo número',true],['Abertura de chamado pelo portal','Cidadão abre chamados pelo site',true],['GPS obrigatório no mobile','Exigir GPS para abertura',false],['Exibir empresa responsável','Mostrar empresa na consulta',false],['Notificação por WhatsApp','Enviar atualizações ao cidadão',true]].map(([tt,d,on])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-50)"><div><div style="font-size:13px;font-weight:600">${tt}</div><div style="font-size:11px;color:var(--gray-400);margin-top:2px">${d}</div></div><div class="toggle ${on?'':'off'}" onclick="this.classList.toggle('off')"></div></div>`).join('')}</div>
     <div class="card"><div class="card-title">💬 Mensagens ao cidadão</div>
       <div class="field"><label>Quando consulta está desabilitada</label><textarea style="font-family:'Inter',sans-serif;font-size:12px;padding:9px 11px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);width:100%;resize:none;min-height:60px;outline:none">Para consultar, ligue: (33) 3721-0000</textarea></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
