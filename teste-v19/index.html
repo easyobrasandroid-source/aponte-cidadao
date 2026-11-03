@@ -2102,7 +2102,8 @@ function filtrarMapa(){
     if(CU?.perfil==='prefeitura'&&c.cidade_id!==CU.cidade_id)return false;
     if(CU?.perfil==='consorcio'&&c.consorcio_id!==CU.consorcio_id)return false;
     if(fcidade && c.cidade!==fcidade) return false;
-    if(fstatus && c.status!==fstatus) return false;
+    if(fstatus && (fstatus==='Em atraso' ?
+       window.v19StatusSLA?.(c).estado!=='Em atraso' : c.status!==fstatus))return false;
     if(ftipo && !c.tipo.includes(ftipo.replace('Lâmpada ',''))) return false;
     if(fempresa && c.empresa!==fempresa) return false;
     if(fperiodo && c.created_at){
@@ -2125,17 +2126,21 @@ function filtrarMapa(){
     && Math.abs(Number(c.lat))<=90 && Math.abs(Number(c.lng))<=180);
 
   // Stats
-  const counts={total:filtrados.length,atraso:filtrados.filter(c=>c.status==='Em atraso').length,exec:filtrados.filter(c=>c.status==='Em execução').length,conc:filtrados.filter(c=>c.status==='Concluído').length};
+  const counts={total:filtrados.length,
+    atraso:filtrados.filter(c=>window.v19StatusSLA?.(c).estado==='Em atraso').length,
+    exec:filtrados.filter(c=>c.status==='Em execução').length,
+    conc:filtrados.filter(c=>c.status==='Concluído').length};
   const statsEl=document.getElementById('mapa-stats');
   if(statsEl) statsEl.innerHTML=`
     <div class="mapa-stat"><div class="mapa-stat-dot" style="background:var(--brand)"></div><div><div class="mapa-stat-val" style="color:var(--brand)">${counts.total}</div><div class="mapa-stat-lbl">No mapa · ${semGPS} sem GPS</div></div></div>
-    <div class="mapa-stat"><div class="mapa-stat-dot" style="background:#DC2626"></div><div><div class="mapa-stat-val" style="color:#DC2626">${counts.atraso}</div><div class="mapa-stat-lbl">Em atraso</div></div></div>
+    <div class="mapa-stat"><div class="mapa-stat-dot" style="background:#DC2626"></div><div><div class="mapa-stat-val" style="color:#DC2626">${counts.atraso}</div><div class="mapa-stat-lbl">Em atraso no mapa</div></div></div>
     <div class="mapa-stat"><div class="mapa-stat-dot" style="background:#D97706"></div><div><div class="mapa-stat-val" style="color:#D97706">${counts.exec}</div><div class="mapa-stat-lbl">Em execução</div></div></div>
     <div class="mapa-stat"><div class="mapa-stat-dot" style="background:#16A34A"></div><div><div class="mapa-stat-val" style="color:#16A34A">${counts.conc}</div><div class="mapa-stat-lbl">Concluídos</div></div></div>`;
 
   const bounds=[];
   filtrados.forEach(c=>{
-    const mk=L.marker([c.lat,c.lng],{icon:criarIcone(c.status)});
+    const statusMapa=window.v19StatusSLA?.(c).estado==='Em atraso'?'Em atraso':c.status;
+    const mk=L.marker([c.lat,c.lng],{icon:criarIcone(statusMapa)});
     const dtAbertura=c.created_at?new Date(c.created_at).toLocaleString('pt-BR'):c.data;
     const dtConclusao=c.completed_at?new Date(c.completed_at).toLocaleString('pt-BR'):'—';
     const locSrc={'gps_mobile':'📱 GPS do dispositivo','address_geocoding':'🗺 Geocodificação','manual':'✏️ Manual'}[c.loc_src]||'—';
@@ -2148,6 +2153,7 @@ function filtrarMapa(){
         ${c.completed_at?`<div class="mp-row">✅ <span>Conclusão: ${dtConclusao}</span></div>`:''}
         <div class="mp-row">🏢 <span>${escMapa(c.empresa)}</span></div>
         <div class="mp-row">${locSrc}</div>
+        <div class="mp-row">⏱ <span>${escMapa(window.v19StatusSLA?.(c).estado||'SLA não apurável')} (estimativa)</span></div>
         <div style="margin-top:6px"><span style="background:${getCor(c.status)};color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">${escMapa(c.status)}</span></div>
         <button class="mp-btn" onclick="closeAllPopups();abrirDrawer('${c.id}');showView('chamados')">👁 Ver detalhes do chamado</button>
       </div>`,
