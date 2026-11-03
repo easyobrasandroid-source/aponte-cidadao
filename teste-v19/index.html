@@ -1188,7 +1188,7 @@ async function carregarChamadosDoBanco(){
       cidade: r.cidade||'', bairro: r.bairro||'', endereco: r.endereco||'',
       referencia: r.referencia||'', obs: r.observacoes||'', area: r.area||'Urbana', tipo: r.tipo||'',
       qtd: r.qtd||1, status: r.status||'Recebido', empresa: r.empresa||'',
-      prioridade: r.prioridade||'Média', sla: r.sla_horas||48,
+      prioridade: r.prioridade||'Média', sla: r.sla_horas||48, _slaHoras:r.sla_horas==null?null:Number(r.sla_horas),
       slaPct: r.status==='Concluído'?100:0, sla_pausado: r.sla_pausado||false,
       origem: r.origem||'Público', solicitante: r.solicitante_nome||'',
       tel: r.solicitante_tel||'', lat: r.latitude||null, lng: r.longitude||null,
@@ -2856,7 +2856,7 @@ function vRelatorios(b,t,a){
         </div>
         <div style="background:var(--green-light);border-radius:8px;padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:800;color:var(--green)">${co}</div>
-          <div style="font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase">Concluídos · SLA ${pct}%</div>
+          <div style="font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase">Concluídos (${pct}% do total)</div>
         </div>
         <div style="background:${crit>0?'var(--red-light)':'var(--green-light)'};border-radius:8px;padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:800;color:${crit>0?'var(--red)':'var(--green)'}">${mats.length}</div>
@@ -4722,5 +4722,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
 </div>
 <script src="./v19.js" defer></script>
 <script src="./v19-fotos.js" defer></script>
+<script src="./v19-relatorios.js" defer></script>
 </body>
 </html>
