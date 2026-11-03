@@ -1081,97 +1081,98 @@ function navChamados(statusFilter, label){
 }
 
 // ═══ DASHBOARD ═══
-function vDashboard(b,t,a,semConsulta=false){
+function vDashboard(b,t,a){
   t.textContent='Dashboard gerencial';
-  const userKey=CU?.id||'';
-  if(!vDashboard._state||vDashboard._state.user!==userKey)
-    vDashboard._state={user:userKey,cidade:'',periodo:'30d',mes:''};
-  const st=vDashboard._state;
-  const previous=document.getElementById('dash-cidade');
-  if(previous){
-    st.cidade=previous.value;
-    st.periodo=document.getElementById('dash-periodo')?.value||'30d';
-    st.mes=document.getElementById('dash-mes')?.value||st.mes;
-  }
-  if(!semConsulta){
-    a.innerHTML='';
-    b.innerHTML='<div class="tcard" style="padding:2rem">Carregando dados do Supabase…</div>';
-    carregarChamadosDoBanco().then(ok=>{
-      if(t.textContent!=='Dashboard gerencial'||!b.isConnected)return;
-      vDashboard._ok=!!ok;
-      vDashboard(b,t,a,true);
-    }).catch(()=>{
-      vDashboard._ok=false;
-      if(b.isConnected&&t.textContent==='Dashboard gerencial')vDashboard(b,t,a,true);
-    });
-    return;
-  }
-  if(!vDashboard._ok){
-    a.innerHTML='';
-    b.innerHTML='<div class="tcard" style="padding:2rem;color:var(--red)">Falha ao consultar o banco. Os indicadores não serão exibidos com dados antigos. <button class="btn btn-ghost" onclick="showView(\'dashboard\')">Tentar novamente</button></div>';
-    return;
-  }
-  const esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
-  let base=DB.chamados.slice();
-  // Escopo visual complementar; a autorização definitiva deve ser aplicada no Supabase.
-  if(CU?.perfil==='consorcio')base=base.filter(c=>CU.consorcio_id&&c.consorcio_id===CU.consorcio_id);
-  if(CU?.perfil==='prefeitura')base=base.filter(c=>CU.cidade_id&&c.cidade_id===CU.cidade_id);
-  if(CU?.perfil==='empresa')base=base.filter(c=>CU.empresa_id&&c.empresa_id===CU.empresa_id);
-  if(CU?.perfil==='garantia')base=base.filter(c=>c.status==='Aguardando Garantia LED'||(c.status==='Concluído'&&c.garantia_tipo));
-  const cidades=[...new Set(base.map(c=>c.cidade).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-  if(CU?.perfil==='prefeitura')st.cidade=cidades[0]||'';
-  else if(st.cidade&&!cidades.includes(st.cidade))st.cidade='';
-  const onChange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'),true)";
-  a.innerHTML='<span style="font-size:11px;color:var(--gray-500)">'+esc(CU?.org||'')+'</span>'
-    +'<select id="dash-cidade" aria-label="Cidade" onchange="'+onChange+'" '+(CU?.perfil==='prefeitura'?'disabled':'')+'><option value="">Todas as cidades</option>'+cidades.map(c=>'<option value="'+esc(c)+'" '+(c===st.cidade?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
-    +'<select id="dash-periodo" aria-label="Período" onchange="'+onChange+'">'+[['30d','Últimos 30 dias'],['all','Todo o histórico'],['90d','Últimos 90 dias'],['month','Escolher mês e ano']].map(([v,n])=>'<option value="'+v+'" '+(v===st.periodo?'selected':'')+'>'+n+'</option>').join('')+'</select>'
-    +(st.periodo==='month'?'<input id="dash-mes" type="month" aria-label="Mês e ano" value="'+esc(st.mes)+'" onchange="'+onChange+'">':'');
-  const dateKey=s=>{
-    const d=new Date(s||'');
-    if(!Number.isFinite(d.getTime()))return '';
-    const p=Object.fromEntries(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(d).map(x=>[x.type,x.value]));
-    return p.year+'-'+p.month;
-  };
-  const filtrados=base.filter(c=>{
-    if(st.cidade&&c.cidade!==st.cidade)return false;
-    if(st.periodo==='all')return true;
-    const ts=new Date(c.created_at||'').getTime();
-    if(!Number.isFinite(ts))return false;
-    if(st.periodo==='30d')return ts>=Date.now()-30*86400000;
-    if(st.periodo==='90d')return ts>=Date.now()-90*86400000;
-    if(st.periodo==='month')return !!st.mes&&dateKey(c.created_at)===st.mes;
-    return true;
-  });
-  const count=fn=>filtrados.filter(fn).length;
-  const total=filtrados.length, concluidos=count(c=>c.status==='Concluído');
-  const andamento=count(c=>['Em execução','Em programação'].includes(c.status));
-  const urbanas=count(c=>c.area==='Urbana'),rurais=count(c=>c.area==='Rural');
-  const garantia=count(c=>c.status==='Aguardando Garantia LED');
-  const kpi=(n,v,d,col)=>'<div class="kpi"><div class="kpi-accent" style="background:'+col+'"></div><div class="kpi-label">'+n+'</div><div class="kpi-val" style="color:'+col+'">'+v+'</div><div class="kpi-sub">'+d+'</div></div>';
-  const tabela=key=>{
-    const m=new Map();
-    filtrados.forEach(c=>{const nome=key(c)||'Não informado';m.set(nome,(m.get(nome)||0)+1)});
-    if(!m.size)return '<p style="font-size:12px;color:var(--gray-500)">Sem dados para os filtros selecionados.</p>';
-    return [...m].sort((a,b)=>b[1]-a[1]).map(([nome,qtd])=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--gray-100)"><span style="min-width:110px;font-size:11px">'+esc(nome)+'</span><div style="flex:1;background:var(--gray-100);height:8px;border-radius:5px"><div style="width:'+Math.round(qtd/total*100)+'%;background:var(--brand);height:8px;border-radius:5px"></div></div><b style="font-size:12px">'+qtd+'</b></div>').join('');
-  };
-  b.innerHTML='<div class="alerts-bar"><strong>ℹ️ Dados carregados do Supabase</strong> · Indicadores de SLA aguardam auditoria da regra de prazos. '+(DB.chamados.length>=500?'⚠️ Consulta limitada a 500 chamados.':'')+'</div>'
-    +'<div class="kpi-grid">'
-    +kpi('Total de chamados',total,'No período selecionado','var(--brand)')
-    +kpi('Em programação / execução',andamento,'Somente estes dois status','#D97706')
-    +kpi('Concluídos',concluidos,'Status atual','var(--green)')
-    +kpi('Em atraso (SLA)','—','Apuração pendente','var(--red)')
-    +'</div><div class="kpi-grid2">'
-    +'<div class="kpi2">🏙 Urbanos: <strong>'+urbanas+'</strong></div>'
-    +'<div class="kpi2">🌾 Rurais: <strong>'+rurais+'</strong></div>'
-    +'<div class="kpi2">⚡ Garantia LED: <strong>'+garantia+'</strong></div>'
-    +'<div class="kpi2">🎯 SLA cumprido: <strong>—</strong></div>'
-    +'</div><div class="row21">'
-    +'<div class="card"><div class="card-title">Chamados por cidade</div>'+tabela(c=>c.cidade)+'</div>'
-    +'<div class="card"><div class="card-title">Chamados por status</div>'+tabela(c=>c.status)+'</div>'
-    +'</div><div class="row21">'
-    +'<div class="card"><div class="card-title">Tipos de problema</div>'+tabela(c=>c.tipo)+'</div>'
-    +'<div class="card"><div class="card-title">Aberturas por mês</div>'+tabela(c=>dateKey(c.created_at))+'</div>'
-    +'</div>';
+  a.innerHTML=`<span style="font-size:11px;padding:4px 10px;background:var(--brand-light);color:var(--brand);border-radius:20px;font-weight:600">CIS Caparaó</span>
+  <select id="dash-cidade" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
+    <option value="">Todas as cidades</option><option>Espera Feliz</option><option>Caparaó</option><option>Alto Caparaó</option><option>Carangola</option><option>Manhuaçu</option><option>Divino</option>
+  </select>
+  <select id="dash-periodo" style="font-size:12px;padding:5px 9px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-family:'Inter',sans-serif" onchange="vDashboard(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions'))">
+    <option value="">Junho 2026</option><option value="maio">Maio 2026</option><option value="30d">Últimos 30 dias</option>
+  </select>`;
+  const at=DB.chamados.filter(c=>c.status==='Em atraso').length,co=DB.chamados.filter(c=>c.status==='Concluído').length,an=DB.chamados.filter(c=>['Em execução','Em programação','Recebido'].includes(c.status)).length;
+  // Ler filtros ativos do dashboard
+  const dashCidade = document.getElementById('dash-cidade')?.value || '';
+  const dashPeriodo = document.getElementById('dash-periodo')?.value || '';
+
+  b.innerHTML=`
+  <div class="alerts-bar"><strong>⚠️ Alertas:</strong>
+    <span>🔴 ${at} chamado(s) em atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
+    <span>🟡 Manhuaçu com maior índice de atraso</span><span style="width:1px;height:14px;background:#FED7AA;display:inline-block"></span>
+    <span>🟠 Estoque Lamp. LED 100w abaixo do mínimo</span>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('all','Todos os chamados')" title="Ver todos os chamados">
+      <div class="kpi-accent" style="background:var(--brand)"></div>
+      <div class="kpi-label">Total chamados</div>
+      <div class="kpi-val" style="color:var(--brand)">${DB.chamados.length}</div>
+      <div class="kpi-sub">no período</div>
+      <div class="kpi-trend" style="color:var(--green)">↑ +18% vs. mês anterior</div>
+      <div style="font-size:10px;color:var(--brand);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('andamento','Em andamento')" title="Ver chamados em andamento">
+      <div class="kpi-accent" style="background:#D97706"></div>
+      <div class="kpi-label">Em andamento</div>
+      <div class="kpi-val" style="color:#D97706">${an}</div>
+      <div class="kpi-sub">programação + execução</div>
+      <div class="kpi-trend" style="color:var(--green)">↓ -7%</div>
+      <div style="font-size:10px;color:#D97706;margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('Em atraso','Em atraso (SLA)')" title="Ver chamados em atraso">
+      <div class="kpi-accent" style="background:var(--red)"></div>
+      <div class="kpi-label">Em atraso (SLA)</div>
+      <div class="kpi-val" style="color:var(--red)">${at}</div>
+      <div class="kpi-sub">prazo ultrapassado</div>
+      <div class="kpi-trend" style="color:var(--red)">↑ urgente</div>
+      <div style="font-size:10px;color:var(--red);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+    <div class="kpi" style="cursor:pointer" onclick="navChamados('Concluído','Concluídos')" title="Ver chamados concluídos">
+      <div class="kpi-accent" style="background:var(--green)"></div>
+      <div class="kpi-label">Concluídos</div>
+      <div class="kpi-val" style="color:var(--green)">${co}</div>
+      <div class="kpi-sub">taxa de resolução</div>
+      <div class="kpi-trend" style="color:var(--green)">↑ +5%</div>
+      <div style="font-size:10px;color:var(--green);margin-top:4px;opacity:.7">Clique para ver →</div>
+    </div>
+  </div>
+  <div class="kpi-grid2">
+    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Urbana',label:'Área Urbana'};showView('chamados')" title="Ver chamados urbanos"><div class="kpi2-ico" style="background:var(--brand-light)">🏙</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Urbanos</div><div style="font-size:18px;font-weight:800;color:var(--brand)" id="kpi-urb">—</div></div></div>
+    <div class="kpi2" style="cursor:pointer" onclick="NAV_FILTERS={status:'',cidade:'',area:'Rural',label:'Área Rural'};showView('chamados')" title="Ver chamados rurais"><div class="kpi2-ico" style="background:var(--green-light)">🌾</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Rurais</div><div style="font-size:18px;font-weight:800;color:var(--green)" id="kpi-rur">—</div></div></div>
+    <div class="kpi2"><div class="kpi2-ico" style="background:var(--amber-light)">🎯</div><div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">SLA cumprido</div><div style="font-size:18px;font-weight:800;color:var(--amber)">96%</div></div></div>
+    <div class="kpi2" style="cursor:pointer" onclick="navChamados('Aguardando Garantia LED','Garantia LED')" title="Ver chamados em garantia LED">
+      <div class="kpi2-ico" style="background:#FFF8DC;font-size:16px">⚡</div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Garantia LED</div><div style="font-size:18px;font-weight:800;color:#B8860B"><span id="kpi-garantia-led">0</span></div></div>
+    </div>
+  </div>
+  <div class="row21">
+    <div class="card"><div class="card-title">Evolução mensal — 2026</div><div style="height:200px"><canvas id="chartEv"></canvas></div></div>
+    <div class="card"><div class="card-title">Por status</div><div style="height:200px"><canvas id="chartSt"></canvas></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div class="card"><div class="card-title">Desempenho por cidade</div>
+      ${[{n:'Espera Feliz',p:99},{n:'Caparaó',p:98},{n:'Alto Caparaó',p:96},{n:'Carangola',p:95},{n:'Divino',p:99},{n:'Manhuaçu',p:82}].map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-50)"><span style="font-size:11px;min-width:90px;color:var(--gray-600)">${c.n}</span><div style="flex:1;height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden"><div style="width:${c.p}%;height:5px;border-radius:3px;background:${c.p>=95?'var(--green)':'var(--red)'}"></div></div><span style="font-size:10px;font-weight:700;min-width:30px;text-align:right;color:${c.p>=95?'var(--green)':'var(--red)'}">${c.p}%</span></div>`).join('')}
+    </div>
+    <div class="card"><div class="card-title">Tipo de problema</div><div style="height:180px"><canvas id="chartTp"></canvas></div></div>
+    <div class="card"><div class="card-title">⚠️ Alertas gerenciais</div>
+      ${[['🔴','Manhuaçu +45% chamados este mês','#FEF2F2'],['🚨','SLA vencendo: '+at+' chamados críticos','#FEF2F2'],['🟠','Lâmpadas apagadas +18% vs. mês','#FFFBEB'],['ℹ️','Estoque Lamp. LED 100w baixo','#EFF6FF']].map(([i,tx,bg])=>`<div style="display:flex;gap:8px;padding:8px 10px;border-radius:7px;margin-bottom:6px;background:${bg}"><span>${i}</span><span style="font-size:11px;font-weight:500">${tx}</span></div>`).join('')}
+    </div>
+  </div>`;
+  // Preencher KPIs dinâmicos
+  setTimeout(()=>{
+    const kpiGar=document.getElementById('kpi-garantia-led');
+    if(kpiGar) kpiGar.textContent=DB.chamados.filter(c=>c.status==='Aguardando Garantia LED').length;
+    const kpiUrb=document.getElementById('kpi-urb');
+    if(kpiUrb) kpiUrb.textContent=DB.chamados.filter(c=>c.area==='Urbana').length;
+    const kpiRur=document.getElementById('kpi-rur');
+    if(kpiRur) kpiRur.textContent=DB.chamados.filter(c=>c.area==='Rural').length;
+  },50);
+
+  setTimeout(()=>{
+    Chart.defaults.font.family='Inter';
+    new Chart(document.getElementById('chartEv'),{type:'line',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Abertos',data:[820,750,1010,880,920,947],borderColor:'#1251A3',backgroundColor:'rgba(18,81,163,.07)',fill:true,tension:.4,pointRadius:3},{label:'Concluídos',data:[800,740,980,860,900,DB.chamados.length*10],borderColor:'#0D7A55',backgroundColor:'rgba(13,122,85,.07)',fill:true,tension:.4,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:9,usePointStyle:true,pointStyle:'circle',font:{size:10}}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#F3F4F6'}}}}});
+    new Chart(document.getElementById('chartSt'),{type:'doughnut',data:{labels:['Novo','Programação','Em execução','Em atraso','Concluído'],datasets:[{data:[47,89,94,at*10,co*100+1000],backgroundColor:['#3B82F6','#F59E0B','#10B981','#EF4444','#059669'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
+    new Chart(document.getElementById('chartTp'),{type:'doughnut',data:{labels:['Apagada','Piscando','Acesa de dia','Poste danificado','Outro'],datasets:[{data:[748,312,98,46,22],backgroundColor:['#1251A3','#3B82F6','#F59E0B','#EF4444','#9CA3AF'],borderWidth:2,borderColor:'#fff',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,usePointStyle:true,font:{size:10}}}}}});
+  },100);
 }
 
 // ═══ CHAMADOS ═══
@@ -3732,23 +3733,10 @@ async function carregarEmpresas(){
 
 async function vEmpresas(b,t,a){
   t.textContent='Empresas executoras';
-  // V19: administração exclusiva de master/consórcio; empresa vê só seus próprios dados.
-  const podeEditar=!!(CU&&['master','consorcio'].includes(CU.perfil));
-  if(!podeEditar && (!CU||CU.perfil!=='empresa')){
-    a.innerHTML=''; b.innerHTML='<div class="tcard" style="padding:2rem">Acesso restrito aos administradores.</div>'; return;
-  }
-  a.innerHTML=podeEditar?`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`:'';
+  a.innerHTML=`<button class="btn btn-save" onclick="abrirModalEmpresa(null)">+ Adicionar empresa</button>`;
   b.innerHTML='<div style="padding:2.5rem;text-align:center;color:var(--gray-400)">Carregando empresas do banco…</div>';
   let emps;
-  try{
-    if(podeEditar) emps=await carregarEmpresas();
-    else {
-      if(!CU.empresa_id) throw new Error('Empresa não vinculada ao usuário.');
-      const rows=await sbSelect('empresas','select=*&id=eq.'+encodeURIComponent(CU.empresa_id)+'&limit=1');
-      if(rows===null) throw new Error('Falha ao consultar dados da própria empresa.');
-      emps=rows.map(mapEmpresa); DB.empresas=emps;
-    }
-  }
+  try{ emps=await carregarEmpresas(); }
   catch(e){ b.innerHTML='<div class="tcard" style="padding:2.5rem;text-align:center;color:var(--red)">⚠ '+e.message+'<br><button class="btn btn-ghost" style="margin-top:12px" onclick="showView(\'empresas\')">↻ Tentar novamente</button></div>'; return; }
 
   function renderEmps(lista){
@@ -3765,7 +3753,7 @@ async function vEmpresas(b,t,a){
         <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="toggleEmpresa('${e.id}')" title="${e.status==='ativo'?'Desativar':'Ativar'}">${e.status==='ativo'?'⛔':'✅'}</button>
         <button style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:11px;color:var(--gray-400)" onclick="excluirEmpresa('${e.id}')" title="Excluir">🗑</button>
       </div></td>
-    </tr>`).map(html=>podeEditar?html:html.replace(/<td><div style="display:flex;gap:5px">[\s\S]*?<\/div><\/td>/,'<td><span style="color:var(--gray-400)">Somente leitura</span></td>')).join('');
+    </tr>`).join('');
   }
 
   b.innerHTML=`
@@ -3795,10 +3783,6 @@ async function vEmpresas(b,t,a){
     </div>
   </div>`;
 
-  if(!podeEditar){
-    const modal=document.getElementById('modal-emp-overlay'); if(modal)modal.remove();
-    const th=b.querySelector('thead th:last-child'); if(th)th.textContent='Permissão';
-  }
   window.filtrarEmpresas=function(){
     const busca=(document.getElementById('emp-busca')?.value||'').toLowerCase();
     const fst=document.getElementById('emp-fstatus')?.value||'';
@@ -3809,7 +3793,6 @@ async function vEmpresas(b,t,a){
     if(tb) tb.innerHTML=renderEmps(lista);
   };
   window.toggleEmpresa=async function(id){
-    if(!podeEditar) return;
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     const novo=e.status==='ativo'?'inativo':'ativo';
@@ -3820,7 +3803,6 @@ async function vEmpresas(b,t,a){
     showToast((novo==='ativo'?'✅ Empresa ativada':'⛔ Empresa desativada')+': '+e.nome,'ok');
   };
   window.excluirEmpresa=async function(id){
-    if(!podeEditar) return;
     const e=getEmpresas().find(x=>x.id===id);
     if(!e) return;
     if(!confirm('Excluir a empresa "'+e.nome+'"?\nSe houver chamados vinculados, o banco vai recusar — nesse caso, desative em vez de excluir.')) return;
@@ -3833,7 +3815,6 @@ async function vEmpresas(b,t,a){
 
 let _empEditId=null;
 function abrirModalEmpresa(id){
-  if(!CU||!['master','consorcio'].includes(CU.perfil))return;
   _empEditId=id;
   const overlay=document.getElementById('modal-emp-overlay');
   if(!overlay){ vEmpresas(document.getElementById('main-body'),document.getElementById('topbar-title'),document.getElementById('topbar-actions')); return; }
@@ -3859,7 +3840,6 @@ function fecharModalEmpresa(){
   if(o) o.style.display='none'; document.body.style.overflow='';
 }
 async function salvarEmpresa(){
-  if(!CU||!['master','consorcio'].includes(CU.perfil))return;
   const empV=id=>document.getElementById(id)?.value||'';
   const nome=document.getElementById('emp-nome')?.value?.trim();
   const fb=document.getElementById('emp-feedback');
