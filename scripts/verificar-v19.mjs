@@ -10,7 +10,7 @@ const v18=read('teste-v18/index.html');
 assert(html.includes('function vDashboard('),'V19 perdeu o dashboard');
 assert(html.includes('function vMapa('),'V19 perdeu o mapa');
 assert(html.includes('function vChamados('),'V19 perdeu a tela de chamados');
-const scripts=['v19.js','v19-fotos.js','v19-relatorios.js','v19-config.js'];
+const scripts=['v19.js','v19-fotos.js','v19-relatorios.js','v19-config.js','v19-assumir.js'];
 const refs=[...html.matchAll(/<script\b[^>]*src=["']\.\/([^"']+)["'][^>]*><\/script>/g)].map(x=>x[1]);
 for(const script of scripts){
   assert(refs.includes(script),'Script não referenciado: '+script);
@@ -28,7 +28,8 @@ const migrations=[
  '03_rpc_estoque_transacional_NAO_APLICAR.sql',
  '04_rls_estoque_isolamento_NAO_APLICAR.sql',
  '05_guard_garantia_e_historico_NAO_APLICAR.sql',
- '06_portal_configuracoes_NAO_APLICAR.sql'
+ '06_portal_configuracoes_NAO_APLICAR.sql',
+ '07_assumir_chamados_NAO_APLICAR.sql'
 ];
 for(const file of migrations){
  assert(existsSync('sql/v19/'+file),'Migration ausente: '+file);
