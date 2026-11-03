@@ -1223,15 +1223,17 @@ function vChamados(b,t,a){
   const navLbl=NAV_FILTERS.label||'';
 
   function calcSLA(c){
-    if(c.completed_at) return{txt:'✓ Concluído',cls:'sla-ok',pct:100};
-    if(!c.created_at) return{txt:c.sla<0?'✗ Vencido '+Math.abs(c.sla)+'h':'✓ '+c.sla+'h',cls:c.sla<0?'sla-late':c.sla<12?'sla-warn':'sla-ok',pct:c.slaPct};
-    const nowSLA=new Date(),openSLA=new Date(c.created_at);
-    const elapsedH=Math.round((nowSLA-openSLA)/36e5);
-    const prazoH=48;
-    const restH=prazoH-elapsedH;
-    if(restH<0) return{txt:'✗ Vencido '+Math.abs(restH)+'h',cls:'sla-late',pct:100};
-    if(restH<12) return{txt:'⚠ '+restH+'h restantes',cls:'sla-warn',pct:Math.round((elapsedH/prazoH)*100)};
-    return{txt:'✓ '+restH+'h restantes',cls:'sla-ok',pct:Math.round((elapsedH/prazoH)*100)};
+    const r=window.v19StatusSLA?.(c);
+    if(!r||r.tempo===null || r.prazo==null)
+      return {txt:'SLA não apurável',cls:'sla-warn',pct:0};
+    const rest=r.prazo-r.tempo;
+    const pct=Math.max(0,Math.min(100,Math.round((r.tempo/r.prazo)*100)));
+    if(c.status==='Concluído')return {
+      txt:r.resultado?'✓ Concluído no prazo (estim.)':'✗ Concluído fora do prazo (estim.)',
+      cls:r.resultado?'sla-ok':'sla-late',pct:100};
+    if(rest<0)return{txt:'✗ Atrasado '+Math.ceil(Math.abs(rest))+'h (estim.)',cls:'sla-late',pct:100};
+    if(rest<12)return{txt:'⚠ '+Math.floor(rest)+'h restantes (estim.)',cls:'sla-warn',pct};
+    return{txt:'✓ '+Math.floor(rest)+'h restantes (estim.)',cls:'sla-ok',pct};
   }
 
   function fmtDT(c){
@@ -1538,8 +1540,11 @@ function abrirDrawer(id){
   const c=CC;
   document.getElementById('dw-proto').textContent=c.protocolo;
   document.getElementById('dw-title').textContent=`${c.tipo} — ${c.qtd} unidade(s)`;
-  const sc=c.sla<0?'var(--red)':c.sla<12?'var(--amber)':'var(--green)';
-  document.getElementById('dw-chips').innerHTML=`<span class="tag ${stm[c.status]||'tag-gray'}">${c.status}</span><span style="font-size:11px;color:${sc};font-weight:600">⏱ ${c.sla<0?'Vencido '+Math.abs(c.sla)+'h':c.sla+'h restantes'}</span><span style="font-size:11px;color:var(--gray-400)">📍 ${c.cidade}</span>`;
+  const sl=window.v19StatusSLA?.(c);
+  const sc=sl?.estado==='Em atraso'||sl?.estado==='Concluído fora do prazo'?
+    'var(--red)':sl?.resultado===true?'var(--green)':'var(--amber)';
+  const descricaoSLA=sl?.estado||'Não apurável';
+  document.getElementById('dw-chips').innerHTML=`<span class="tag ${stm[c.status]||'tag-gray'}">${c.status}</span><span style="font-size:11px;color:${sc};font-weight:600">⏱ ${descricaoSLA} (estimativa)</span><span style="font-size:11px;color:var(--gray-400)">📍 ${c.cidade}</span>`;
   const stepLbls=['Recebido','Programado','Em execução','Aguard. mat.','Concluído'],stepIcos=['✓','✓','⚡','📦','✅'];
   const s2i={'Recebido':0,'Em programação':1,'Em execução':2,'Aguard. material':3,'Concluído':4,'Aguardando Garantia LED':2};
   const ci=s2i[c.status]??-1;
@@ -2808,8 +2813,8 @@ function vRelatorios(b,t,a){
     if(RF.dtIni)   r=r.filter(c=>c.created_at&&new Date(c.created_at)>=new Date(RF.dtIni));
     if(RF.dtFim)   r=r.filter(c=>c.created_at&&new Date(c.created_at)<=new Date(RF.dtFim+'T23:59:59'));
     if(RF.area)    r=r.filter(c=>c.area===RF.area);
-    if(RF.sla==='ok')     r=r.filter(c=>c.sla>=0&&c.status!=='Em atraso');
-    if(RF.sla==='atraso') r=r.filter(c=>c.sla<0||c.status==='Em atraso');
+    if(RF.sla==='ok')     r=r.filter(c=>window.v19StatusSLA?.(c).estado==='Concluído no prazo'||window.v19StatusSLA?.(c).estado==='Em andamento no prazo');
+    if(RF.sla==='atraso') r=r.filter(c=>['Em atraso','Concluído fora do prazo'].includes(window.v19StatusSLA?.(c).estado));
     return r;
   };
   window._rfFiltrarEstoque=function(){
@@ -2838,7 +2843,7 @@ function vRelatorios(b,t,a){
     const ch=window._rfFiltrarChamados();
     const mats=window._rfFiltrarEstoque();
     _exportChamados=ch; _exportMats=mats;
-    const at=ch.filter(c=>c.sla<0||c.status==='Em atraso').length;
+    const at=ch.filter(c=>['Em atraso','Concluído fora do prazo'].includes(window.v19StatusSLA?.(c).estado)).length;
     const co=ch.filter(c=>c.status==='Concluído').length;
     const pct=ch.length?Math.round((co/ch.length)*100):0;
     const crit=mats.filter(m=>m.disp<(m.min||0)||(m.disp/m.cont)*100<20).length;
