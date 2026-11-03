@@ -56,6 +56,25 @@ GRANT EXECUTE ON FUNCTION public.v19_cidade_atual() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.v19_empresa_atual() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.v19_usuario_atual() TO authenticated;
 
+-- Privilegios SQL explicitos: a Data API pode ter exposicao automatica desligada.
+-- As policies abaixo aplicam a filtragem de linhas somente apos GRANT SELECT.
+REVOKE ALL ON public.consorcios,public.cidades,public.empresas,
+ public.empresa_cidades,public.usuarios,public.equipes,public.chamados,
+ public.chamado_historico,public.materiais,public.estoques,
+ public.chamado_materiais,public.movimentacoes,public.sla_configuracoes,
+ public.auditoria FROM anon;
+REVOKE INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER ON
+ public.consorcios,public.cidades,public.empresas,public.empresa_cidades,
+ public.usuarios,public.equipes,public.chamados,public.chamado_historico,
+ public.materiais,public.estoques,public.chamado_materiais,
+ public.movimentacoes,public.sla_configuracoes,public.auditoria
+ FROM authenticated;
+GRANT SELECT ON public.consorcios,public.cidades,public.empresas,
+ public.empresa_cidades,public.usuarios,public.equipes,public.chamados,
+ public.chamado_historico,public.materiais,public.estoques,
+ public.chamado_materiais,public.movimentacoes,public.sla_configuracoes,
+ public.auditoria TO authenticated;
+
 -- Acesso somente SELECT: master ou tenant autorizado.
 -- Fora destas policies, RLS continua bloqueando insercoes/updates/deletes.
 CREATE POLICY v19_consorcios_sel ON public.consorcios FOR SELECT TO authenticated
