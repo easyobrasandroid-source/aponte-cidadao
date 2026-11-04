@@ -159,3 +159,10 @@ Capturas do usuário para o protocolo `V19-TESTE-CONSUMO-ALFA-B-1` confirmaram:
 - A interface exibiu status atualizado; usuário pressionou F5 e apresentou print mostrando o status persistente e a aba Histórico com **1 evento** `Recebido → Em programação`, responsável **Gestor Consórcio Alfa**, horário **04/11/2026 12:45:04** (horário apresentado no navegador).
 - **Teste funcional de status via RPC aprovado no cenário específico**. Próximo teste seguro com a mesma fixture: **Em programação → Em execução**; não concluir e não acionar garantia.
 - Ajuste de UX: `index.html` agora esconde a faixa `Execução finalizada? Marque como concluído` enquanto os botões legados de conclusão e garantia estão bloqueados (commit `ef0515b8618ccd0ab0deece7a1570efaa279a62c`). Alteração ainda não testada no navegador; vale apenas para quem baixar versão nova. A versão local anterior continua habilitada para teste da RPC de status comum.
+
+## Segunda transição de status na UI — aprovado (2026-11-04)
+
+- Print do usuário após F5 no chamado `V19-TESTE-RLS-ALFA-A` confirmou **Em programação → Em execução** e **2 eventos** no histórico, atribuídos ao Gestor Consórcio Alfa; segundo evento mostrado em 04/11/2026 12:48:01.
+- Lista de 6 chamados preservada. A UI fez atualização persistente via RPC `v19_atualizar_status_chamado` no fluxo comum.
+- Próximo cenário de escrita controlado, permitido no SQL 28: **Em execução → Aguard. material**, com histórico esperado de 3 eventos. NÃO clicar em Concluir ou Garantia; continuam bloqueados na UI atual. Após conferir, pode-se planejar volta **Aguard. material → Em execução** sem recriar fixture.
+- Pendente de UX: restringir círculos clicáveis de acordo com matriz de transições SQL 28; actualmente fluxos inválidos são bloqueados pelo servidor, mas a UI pode oferecê-los.
