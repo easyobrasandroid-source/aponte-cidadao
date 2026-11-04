@@ -510,32 +510,56 @@ tbody tr:last-child td{border-bottom:none;}
 // PRODUÇÃO: projeto Supabase `aponte-cidadao` (ref kvzcturkjibmsyjqafbt).
 // A ANON_KEY abaixo é a chave PÚBLICA (role=anon), segura para o navegador —
 // o isolamento real é garantido pelo RLS no banco.
+// Projeto de HOMOLOGACAO V19 exclusivo; nao utilizar credenciais V18.
+const V19_PROJECT_REF = 'xurrhczvyqpwyjemight';
+const V19_PROJECT_URL = 'https://' + V19_PROJECT_REF + '.supabase.co';
+function obterChavePublicaV19(){
+  const cacheKey='aponte_v19_homolog_publishable';
+  const valida=k=>/^sb_publishable_[a-zA-Z0-9_-]{12,}$/.test(k);
+  let chave='';
+  try{ chave=sessionStorage.getItem(cacheKey)||''; }catch(e){}
+  if(!valida(chave)){
+    chave=String(window.prompt(
+      'Aponte Cidadão V19 (SOMENTE HOMOLOGAÇÃO)\\nCole a chave pública sb_publishable_ do projeto V19.\\nNUNCA insira sb_secret ou senha do banco.',
+      ''
+    )||'').trim();
+    if(valida(chave)){
+      try{sessionStorage.setItem(cacheKey,chave);}catch(e){}
+    }else{
+      chave='';
+      window.alert('A V19 não fará nenhuma requisição ao banco até receber a chave pública correta.');
+    }
+  }
+  return chave;
+}
 const CONFIG = {
-  API_URL: 'https://kvzcturkjibmsyjqafbt.supabase.co',
-  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2emN0dXJramlibXN5anFhZmJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NjMzMzYsImV4cCI6MjA5NzIzOTMzNn0.dleugsIijXpoCt8flflXZC4R0LO12IN8SLJbuBm3Zn0',
+  API_URL: V19_PROJECT_URL,
+  ANON_KEY: obterChavePublicaV19(),
   BUCKET_FOTOS: 'chamado-fotos'
 };
 const SUPA_URL = CONFIG.API_URL;      // compat
 const SUPA_KEY = CONFIG.ANON_KEY;     // compat
 // Guarda de segurança: sem configuração não há conexão (bloqueia qualquer chamada).
-const SUPA_CONFIGURADO = !!(SUPA_URL && SUPA_KEY && /^https:\/\/.+\.supabase\.co/.test(SUPA_URL));
-if(!SUPA_CONFIGURADO){ console.warn('[CONFIG] Supabase de PRODUÇÃO não configurado — verifique CONFIG.API_URL e CONFIG.ANON_KEY.'); }
+const SUPA_CONFIGURADO = SUPA_URL===V19_PROJECT_URL && /^sb_publishable_[a-zA-Z0-9_-]{12,}$/.test(SUPA_KEY);
+if(!SUPA_CONFIGURADO){ console.warn('[V19] Homologação bloqueada: configuração pública ausente ou inválida.'); }
 
 // ── Sessão (Supabase Auth): token guardado só no navegador deste usuário ──
 let SB_SESSION = null;
-function loadSession(){ try{ const r=localStorage.getItem('aponte_session'); SB_SESSION=r?JSON.parse(r):null; }catch(e){ SB_SESSION=null; } return SB_SESSION; }
-function saveSession(s){ SB_SESSION=s; try{ if(s) localStorage.setItem('aponte_session',JSON.stringify(s)); else localStorage.removeItem('aponte_session'); }catch(e){} }
+const V19_SESSION_KEY='aponte_v19_homolog_session';
+function loadSession(){ try{const r=sessionStorage.getItem(V19_SESSION_KEY);SB_SESSION=r?JSON.parse(r):null;}catch(e){SB_SESSION=null;}return SB_SESSION;}
+function saveSession(s){SB_SESSION=s;try{if(s)sessionStorage.setItem(V19_SESSION_KEY,JSON.stringify(s));else sessionStorage.removeItem(V19_SESSION_KEY);}catch(e){}}
 loadSession();
 
 // Cabeçalhos: usa o token do usuário logado (para o RLS valer) ou a anon key
 function sbHeaders(extra){
-  const token = (SB_SESSION && SB_SESSION.access_token) ? SB_SESSION.access_token : SUPA_KEY;
-  return Object.assign({
+  // sb_publishable NAO e JWT. Quando anonimo, use somente apikey.
+  const h={
     'apikey': SUPA_KEY,
-    'Authorization': 'Bearer ' + token,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation'
-  }, extra||{});
+    'Content-Type':'application/json',
+    'Prefer':'return=representation'
+  };
+  if(SB_SESSION?.access_token)h.Authorization='Bearer '+SB_SESSION.access_token;
+  return Object.assign(h,extra||{});
 }
 const SUPA_HEADERS = sbHeaders();  // compat (chamadas antigas)
 
@@ -562,6 +586,7 @@ if(SUPA_CONFIGURADO){
 
 // ═══ AUTENTICAÇÃO REAL (Supabase Auth / GoTrue) ═══
 async function sbLogin(email, senha){
+  if(!SUPA_CONFIGURADO)return {ok:false,error:'Informe a chave pública da V19 e atualize a página.'};
   try{
     const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
       method:'POST', headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
@@ -613,7 +638,22 @@ async function sbRefreshSession(){
     return true;
   }catch(e){ return false; }
 }
+const V19_WRITABLE_RPCS = new Set([
+ 'v19_assumir_chamado','v19_atualizar_status_chamado',
+ 'v19_concluir_garantia','v19_listar_disponiveis',
+ 'v19_salvar_material','v19_movimentar_estoque',
+ 'consumir_material_chamado','editar_material_chamado','remover_material_chamado'
+]);
+// Bloqueio por padrao: nao permitir que o frontend legado grave em tabelas
+// antes de existir RPC especifica homologada. GET segue sujeito ao RLS.
 async function sbFetch(path, method='GET', body=null, _retry){
+  if(!SUPA_CONFIGURADO)
+    throw new Error('Projeto V19 nao configurado. Recarregue e informe a chave publica correta.');
+  const verb=String(method).toUpperCase();
+  const rpc=String(path).match(/^rpc\/([a-z0-9_]+)(?:\?|$)/i);
+  if(verb!=='GET' && (verb!=='POST' || !rpc || !V19_WRITABLE_RPCS.has(rpc[1]))){
+    throw new Error('Gravacao direta desabilitada na V19: este fluxo depende de RPC homologada.');
+  }
   const opts = {method, headers: sbHeaders()};
   if(body) opts.body = JSON.stringify(body);
   let r;
@@ -696,25 +736,12 @@ async function carregarCidadesPortal(){
 
 // ═══ MÓDULO ESTOQUE — materiais + saldo ═══
 // Buscar catálogo de materiais com saldo (JOIN materiais + estoques)
+// V19: banco vazio e banco vazio. Nunca executar seeds na interface operacional.
 async function garantirMateriaisNoBanco(){
-  try{
-    const existentes = await sbGetMateriais();
-    if(existentes && existentes.length){
-      DB.materiais = existentes;
-      saveDB(DB);
-      return existentes;
-    }
-    // Banco vazio → migrar seed
-    console.log('[Estoque] populando banco com seed inicial...');
-    const seed = getMats();
-    for(const m of seed){
-      await sbSaveMaterial({n:m.n, u:m.u, min:m.min, preco:m.preco, cont:m.cont, disp:m.disp});
-    }
-    const mats2 = await sbGetMateriais();
-    if(mats2 && mats2.length){ DB.materiais = mats2; saveDB(DB); }
-    console.log('[Estoque] ✅ banco populado:', mats2?.length||0, 'materiais');
-    return mats2;
-  }catch(e){ console.warn('[Estoque] garantir materiais:', e.message); return null; }
+  const materiais=await sbGetMateriais();
+  if(!Array.isArray(materiais))return null;
+  DB.materiais=materiais;
+  return materiais;
 }
 
 async function sbGetMateriais(){
@@ -1022,7 +1049,7 @@ function limparEstadoOperacional(){
   CU=null; CC=null;
   DB={ chamados: [], historico: {}, usuario: null, materiais: null, usuarios: null, auditoria: [] };
   _cidadesMap=null; _cidadeConsorcio=null;   // forçam recarga do catálogo no próximo uso
-  try{ localStorage.removeItem('aponte_db'); localStorage.removeItem('aponte_session'); }catch(e){}
+  try{sessionStorage.removeItem(V19_SESSION_KEY);}catch(e){}
 }
 let _encerrando=false;
 // Sessão expirada e SEM renovação possível → zera memória, encerra o acesso e volta ao login.
