@@ -412,7 +412,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="card-title">Andamento — clique para alterar status</div>
         <div class="ss-wrap" id="dw-steps"></div>
         <div style="background:var(--amber-light);border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:.5rem .75rem;font-size:11px;color:var(--amber)" id="dw-step-note"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-top:.75rem">
+        <div id="dw-finalizar-box" style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-top:.75rem">
           <span style="font-size:12px;color:var(--green);font-weight:500">Execução finalizada? <strong>Marque como concluído</strong></span>
           <div style="display:flex;gap:7px;flex-shrink:0">
             <button class="btn" style="background:#FFF8DC;color:#B8860B;border:1.5px solid #DAA520;font-size:12px;font-weight:700;padding:6px 13px;display:inline-flex;align-items:center;gap:5px" id="dw-acao-garantia" onclick="abrirModalGarantia()" title="Módulo LED com defeito coberto por garantia">⚡ Garantia LED</button>
@@ -1559,6 +1559,10 @@ function abrirDrawer(id){
   if(btnConcluir) btnConcluir.style.display='none'; // Conclusão legada ainda bloqueada
   const btnGarantia=document.getElementById('dw-acao-garantia');
   if(btnGarantia) btnGarantia.style.display='none'; // Encaminhamento legado ainda bloqueado
+  // Esconder também o aviso de conclusão quando as duas ações estão bloqueadas.
+  const finalizarBox=document.getElementById('dw-finalizar-box');
+  if(finalizarBox) finalizarBox.style.display=
+    (btnConcluir?.style.display==='none' && btnGarantia?.style.display==='none')?'none':'flex';
   document.getElementById('dw-dados').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
     <div><div class="card-title">Dados do chamado</div>
       <div class="drow"><span class="dlbl">Cidade</span><span class="dval">${c.cidade}</span></div>
