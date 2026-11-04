@@ -97,3 +97,17 @@ Evidência: cinco capturas de tela fornecidas pelo usuário.
 - Usuário confirmou 5/5 `OK`: RPCs `editar_material_chamado(uuid,numeric)` e `remover_material_chamado(uuid)` instaladas; executáveis por `authenticated`, negadas a `anon`, escrita direta negada.
 - Foi preparado o painel HTML **Aponte_V19_Painel_Edicao_Estorno_Testes_49_a_55.html** (artefato local da conversa). Realiza pré-verificação, bloqueio de Empresa Alfa A, edição Alfa B 2→3 (saldo 12→11), edição 3→1 (saldo 11→13), bloqueio de estorno por Alfa A, estorno autorizado (saldo 13→14), bloqueio de estorno duplicado. Os testes são sequenciais, com verificações de movimentações, auditoria e totais.
 - **Testes 49–55 ainda pendentes de execução pelo usuário.** Não reaplicar SQL 48 nem recriar fixtures. Caso falhe, não repetir a operação antes de auditar banco.
+
+## Testes 49–55 — Edição e estorno de consumo aprovados (2026-11-04)
+
+Evidência: sete screenshots fornecidos pelo usuário. Resultado de aplicação observado (sem auditoria independente do banco).
+
+- 49: Pré-verificação das identidades, chamado ativo, item de consumo 2 unidades/R$100, saldo 12, contratado 25, quatro movimentos e um evento de histórico — OK.
+- 50: Alfa A não responsável tentou editar; HTTP 403, saldos/itens/movimentos/histórico inalterados — OK.
+- 51: Alfa B editou consumo de 2 para 3; saldo **12→11**, total do item R$100→R$150; movimentos **4→5**, histórico **1→2** — OK.
+- 52: Alfa B editou de 3 para 1; saldo **11→13**, total R$150→R$50; movimentos **5→6** (devolução 2), histórico **2→3** — OK.
+- 53: Alfa A bloqueada no estorno, HTTP 403, sem mudanças — OK.
+- 54: Alfa B realizou estorno integral do item remanescente; saldo **13→14**, contratado 25, itens ativos **1→0**, movimentos **6→7**, histórico **3→4** — OK.
+- 55: estorno duplicado negado HTTP 403 (`ITEM_NAO_DISPONIVEL`); saldos, movimentos e histórico preservados — OK.
+
+Próximo: **SQL 56** `sql/v19/56_AUDITORIA_FINAL_ESTOQUE_SOMENTE_LEITURA.sql` preparado, **não executado pelo usuário**, reconciliará saldos x ledger do material fictício, linhas ativas e integridade entre consórcios. Após isso, priorizar concorrência e integração com UI V19 em vez de multiplicar páginas HTML avulsas. Não fazer deploy de produção ainda.
