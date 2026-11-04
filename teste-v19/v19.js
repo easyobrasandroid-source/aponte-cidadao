@@ -121,7 +121,7 @@
     try {
       rpcResult(await sbFetch('rpc/v19_movimentar_estoque','POST',{
         p_material_id:matId,p_tipo:tipo,p_quantidade:qtd,
-        p_observacao:'Movimentação manual pela interface V19'
+        p_observacao:(document.getElementById('mov-obs')?.value||'').trim().slice(0,500) || 'Movimentação manual pela interface V19'
       }));
       const materiais=await sbGetMateriais();
       if (!Array.isArray(materiais)) throw new Error('Movimento confirmado; recarregue a tela para obter o saldo.');
@@ -131,6 +131,75 @@
       showToast('✅ Movimentação confirmada e registrada no histórico.','ok');
     } catch(e) { warn(e.message); }
     finally {if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
+  };
+
+  // HISTORICO REAL V19: mostrar o livro de movimentos (movimentacoes),
+  // e NAO somente itens de consumo ativos (chamado_materiais).
+  // Estornos removem o item operacional, mas preservam o ledger.
+  window.abrirHistoricoMovimentacao = async function () {
+    let ov=document.getElementById('modal-hist-mov');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='modal-hist-mov';
+      document.body.appendChild(ov);
+    }
+    ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center';
+    document.body.style.overflow='hidden';
+    ov.innerHTML=`<div style="background:#fff;border-radius:16px;width:min(94vw,750px);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.28)">
+      <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb">
+        <div><div style="font-size:15px;font-weight:800">📋 Histórico real do estoque</div>
+          <div style="font-size:11px;color:#64748b">Entradas, saídas, consumos, ajustes e estornos registrados no Supabase V19</div></div>
+        <button id="v19-close-history" type="button" style="border:1px solid #e5e7eb;background:#fff;padding:6px 12px;border-radius:8px;cursor:pointer">✕ Fechar</button>
+      </div>
+      <div id="v19-history-content" style="flex:1;overflow-y:auto;padding:14px 20px;color:#475569">Carregando movimentações...</div>
+    </div>`;
+    const close=()=>{
+      ov.style.display='none';
+      document.body.style.overflow='';
+    };
+    ov.querySelector('#v19-close-history').addEventListener('click',close);
+    const target=ov.querySelector('#v19-history-content');
+    try {
+      const rows=await sbSelect('movimentacoes','select=*&order=created_at.desc&limit=200');
+      if(!Array.isArray(rows))
+        throw new Error('A consulta às movimentações não foi autorizada ou não respondeu.');
+      const matNames=new Map(getMats().map(m=>[m.id,m.n]));
+      const chNames=new Map((Array.isArray(DB.chamados)?DB.chamados:[])
+        .filter(ch=>ch?.id).map(ch=>[ch.id,ch.protocolo||ch.id]));
+      if(!rows.length){
+        target.textContent='Nenhuma movimentação registrada para este usuário/consórcio.';
+        return;
+      }
+      const labels={
+        entrada:'Entrada',saida:'Saída',consumo:'Consumo em chamado',
+        devolucao:'Devolução por ajuste',estorno:'Estorno de consumo'
+      };
+      target.innerHTML=`<div style="font-size:12px;color:#475569;margin-bottom:10px">Exibindo ${rows.length} movimentação(ões) — até as 200 mais recentes. Os saldos são calculados no banco.</div>`+
+        rows.map(m=>{
+          const isIn=['entrada','devolucao','estorno'].includes(m.tipo);
+          const sign=isIn?'+':'−';
+          const amount=Number(m.quantidade);
+          const qty=Number.isFinite(amount)?amount.toLocaleString('pt-BR',{maximumFractionDigits:2}):String(m.quantidade??'');
+          const dt=m.created_at?new Date(m.created_at).toLocaleString('pt-BR'):'';
+          const label=labels[m.tipo]||String(m.tipo||'Movimentação');
+          const mat=matNames.get(m.material_id)||m.material_id||'Material';
+          const chamado=m.chamado_id?(chNames.get(m.chamado_id)||m.chamado_id):'';
+          return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+              <div>
+                <div style="font-size:13px;font-weight:700">${escapeHTML(mat)}</div>
+                <div style="font-size:11px;color:#475569">${escapeHTML(label)} · ${escapeHTML(dt)}</div>
+              </div>
+              <div style="color:${isIn?'#047857':'#b91c1c'};font-weight:800;white-space:nowrap">${sign}${escapeHTML(qty)}</div>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:5px">${chamado?'Chamado: '+escapeHTML(chamado)+' · ':''}Responsável: ${escapeHTML(m.usuario_nome||'Sistema')}</div>
+            ${m.observacao?'<div style="font-size:11px;color:#64748b;margin-top:4px">Obs.: '+escapeHTML(m.observacao)+'</div>':''}
+          </div>`;
+        }).join('');
+    }catch(e){
+      target.textContent='Não foi possível consultar o histórico do banco: '+e.message;
+      console.warn('[V19] histórico estoque:',e.message);
+    }
   };
 
   const previousVEstoque = window.vEstoque;
