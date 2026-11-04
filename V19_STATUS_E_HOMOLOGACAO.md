@@ -1,54 +1,38 @@
-# Aponte Cidadão — V19 (em homologação)
+# Aponte Cidadão V19 — Estado verificado da homologação
 
-**Situação:** branch `desenvolvimento-v19`. **Não liberar para produção ainda.**
+**Atualização:** 2026-11-04. **Branch:** `desenvolvimento-v19`.
 
-## Arquivos
-- `teste-v19/index.html` — nova interface isolada da V18.
-- `teste-v19/v19.js` — dados completos, equipes e estoque via Supabase.
-- `teste-v19/v19-fotos.js` — Storage privado e histórico real.
-- `teste-v19/v19-relatorios.js` — exportações filtradas com métricas explícitas.
-- `teste-v19/v19-config.js` — Portal e SLA persistentes por consórcio.
-- `teste-v19/v19-assumir.js` — chamados disponíveis para empresas e atribuição atômica.
-- `sql/v19/03_...sql` até `07_...sql` — migrations **não executadas**.
-- `sql/v19/08_INSTALACAO_CONSOLIDADA_SOMENTE_HOMOLOGACAO.sql` — pacote único transacional para testes em homologação.
-- `scripts/verificar-v19.mjs` — teste estático automático (node --check).
+## Ambiente
 
-## Alterações realizadas
-1. A versão `teste-v18/index.html` foi restaurada bit a bit ao conteúdo original de `main`; V18 publicada preservada.
-2. Dashboard não exibe métricas ou gráficos fabricados; período/mês/cidade selecionáveis.
-3. Equipes lêem/escrevem o banco com confirmação; não se baseiam em `saveDB()`.
-4. Cadastro e movimentação do estoque foram preparados para RPCs atômicas com registro de movimentos; ajustes sem histórico bloqueados no frontend.
-5. Empresa deixa de consultar chamados e fotos de outra empresa pela policy planejada.
-6. Garantia LED pode concluir apenas chamados em garantia que pertençam ao consórcio, após migration de trigger.
-7. PDF/XLSX trabalham com a mesma seleção filtrada; taxa de conclusão não é chamada de taxa de SLA.
-8. Mapa não inventa coordenadas; sinaliza chamados sem GPS e filtros resultam dos dados.
-9. Foto real no bucket privado e histórico lido do banco, sem usar base64 de localStorage.
-10. Portal e SLA têm interface para persistir em tabelas reais, com políticas de autorização.
+- **Projeto V19 separado:** `aponte-cidadao-v19-homologacao`, em São Paulo, com banco novo e 14 tabelas. A produção V18 não deve ser alterada.
+- **Não executar o esquema legado `supabase_schema.sql` nem o pacote antigo `08_INSTALACAO_CONSOLIDADA_SOMENTE_HOMOLOGACAO.sql` neste banco.** Ambos foram escritos para o esquema anterior e não representam o pipeline de instalação limpa.
+- **Arquivos para a base nova:** `sql/v19/01_BASE_LIMPA_HOMOLOGACAO.sql`, `02_DIAGNOSTICO_POS_BASE_SOMENTE_LEITURA.sql`, `03_RLS_LEITURA_PRIVADA_HOMOLOGACAO.sql`; depois os scripts de testes de Auth e massa de dados.
+- Esta anotação registra resultados enviados pelo usuário (CSV/screenshots). Não equivale a auditoria independente do banco.
 
-## Riscos e pendências ANTES DE PUBLICAR
-- **Nenhuma migration foi executada em banco V19 isolado** e nenhum fluxo foi testado numa sessão real de navegador. As verificações automáticas são de sintaxe/arquivos, **não** testes funcionais ou de segurança.
-- A V18 e a V19 ainda compartilham o Supabase de produção **se a interface V19 for apontada para o endpoint atual**. Criar projeto de homologação ou banco isolado, importar esquema e dados de teste, conectar configuração V19 ao ambiente próprio, executar migrations em ordem 03→04→05→06.
-- Confirmar nomes de colunas e compatibilidade dos scripts em execução Postgres no projeto de homologação. Prever transação/rollback e backup antes do deploy final.
-- V19-013: fluxo de **assumir chamados disponíveis** preparado no frontend + RPC de projeção mínima e atribuição atômica; **ainda não testado** com dois executores concorrentes.
-- V19-021: gestão de usuários e convites ainda não totalmente auditada/ajustada em V19.
-- Segurança de telefone: **consulta por telefone NÃO implementada**; somente protocolo exato deve ser autorizado sem OTP.
-- `notificacao_whatsapp`: preferencia armazenada, **não há envio automático**.
-- SLA estimado em horas corridas: não representa dias úteis, pausas completas, feriados, reaberturas ou contratos específicos. `sla_pausado` resulta em **não apurável**; é preciso modelo canônico de contagem.
-- Histórico retroativo não deve ser inventado. Confirmar políticas de insert e trigger evitando duplos registros.
-- A página de mapa original ainda é Leaflet e precisa teste em navegador com dados de GPS reais e geocodificação.
-- Fluxos de foto precisam ser exercitados com Auth real, usuário de outra empresa, upload duplo e leitura após F5.
-- Configuração do portal deve ter dados públicos realmente aplicados pela UI de cidadão (a RPC futura de 06 bloqueia abertura/consulta; visual pode não refletir de imediato).
-- Dashboard/relatórios não apresentam os mesmos KPI de SLA nas demais telas enquanto relógio canônico não estiver finalizado.
-- Validar duplicação de `sla_configuracoes` por par consórcio/tipo e `estoques`, além dos registros de usuários; testes RLS por consórcio requerem 2 tenants.
-- **NÃO fazer merge do PR** e não publicar `teste-v19/` como produção antes de os critérios de aceite críticos passarem.
+## Testes realizados e aprovados por evidência enviada
 
-## Ordem do release
-1. Validar todos os scripts numa instância de **homologação isolada**.
-2. Executar script consolidado 08 em homologação, com transação e revisão dos avisos.
-3. Executar suíte de regressão perfis Master, Consórcio, Prefeitura, Empresa A, Empresa B e Garantia e ataques diretos às APIs.
-4. Verificar 21 critérios V19 do dossiê, além dos 38 testes de aceite.
-5. Corrigir os testes reprovados, rodar verificação estática e testes manuais, aprovar o merge.
-6. Preparar migração de produção com backup, observabilidade e rollback.
+- 14/14 tabelas criadas com RLS ativo e, no diagnóstico inicial, uma policy por tabela.
+- 2 consórcios, 3 municípios e 3 empresas fictícias; 7 contas Supabase Auth vinculadas.
+- Leitura por API real: Master 3 chamados, empresas Alfa A/B e Beta A com seus chamados, Consórcio Alfa 2, Prefeitura Alfa 1 2, Garantia Alfa 0 antes do primeiro encaminhamento.
+- Garantia LED: leitura de chamado elegível confirmada, chamada não responsável bloqueada com HTTP 403.
+- SQL 17 instalou `v19_concluir_garantia(uuid)` e trigger de histórico; SQL 18 passou a permitir conclusão por perfil Garantia do consórcio ou empresa já atribuída na cidade autorizada.
+- Teste 20: empresa Alfa B não concluiu chamado Alfa A; status/histórico intactos.
+- Teste 21: empresa Alfa A concluiu o chamado Alfa-1, com data, responsável e histórico (1 evento).
+- Teste 23: técnico Garantia Alfa concluiu Alfa-2, mantendo empresa e cidade, com histórico (1 evento).
+- Teste 24: segunda conclusão de Alfa-2 recusada (HTTP 400), status/datas/histórico preservados.
 
-## Estado da limpeza de teste V18
-O usuário executou manualmente exclusão de um material de teste e seu estoque; pós-consulta confirmou ambos EXCLUÍDO. Isso é a única alteração de dados de produção realizada durante esta etapa.
+## Próxima etapa
+
+- **SQL 25:** `sql/v19/25_ATRIBUICAO_SEGURA_EMPRESAS_HOMOLOGACAO.sql` — criado na branch, **ainda não confirmado como executado**. Instala `v19_listar_disponiveis(integer)` e `v19_assumir_chamado(uuid)`, com escopo de empresa e cidade, atualização atômica e histórico.
+- Criar um chamado fictício SEM empresa e testar listagem apenas nas cidades autorizadas, atribuição concorrente entre Alfa A e Alfa B e bloqueio de outra empresa/consórcio.
+- Depois implementar/validar abertura, edição, conclusão normal, reabertura e histórico. Revisar modelos de dados e contratos antes de permitir UPDATE direto.
+- Validar autenticação real e isolamento em outras tabelas, fotos privadas, estoque, equipes, portal, SLA, mapas, relatórios e experiências de usuário.
+- Executar regressão formal dos 21 critérios V19 + 38 casos de aceite e piloto antes de merge/publicação.
+
+## Riscos ainda abertos
+
+- RLS já foi testado em cenários de chamados, mas não em todos os objetos/RPCs.
+- Controle de acesso a fotos, telefone, publicações e campos pessoais ainda requer testes de API.
+- Dashboard e relatórios ainda não possuem modelo canônico de SLA (feriados, pausas, dias úteis, reaberturas).
+- Frontend `teste-v19/` tem integrações escritas para a estrutura antiga; **não apontar para V19 como produção sem adaptação e validação**.
+- A aplicação da V19 e a migração do legado permanecem não autorizadas até concluir os portões críticos.
