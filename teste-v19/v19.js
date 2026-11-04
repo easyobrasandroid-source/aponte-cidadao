@@ -128,6 +128,13 @@
       DB.materiais=materiais;
       renderEstoqueGrid();
       fecharModalMov();
+      // O grid era atualizado, mas o KPI "saídas no mês" permanecia antigo
+      // até F5. Reconsultar o livro de movimentos após a transação confirmada.
+      contarMovimentosSaidaMes().then(count=>{
+        const kpi=document.getElementById('stk-saidas');
+        if(kpi)kpi.textContent=count.toLocaleString('pt-BR');
+        window._v19SaidasMes=count;
+      }).catch(e=>console.warn('[V19] contador de saídas após movimentação:',e.message));
       showToast('✅ Movimentação confirmada e registrada no histórico.','ok');
     } catch(e) { warn(e.message); }
     finally {if(btn){btn.disabled=false;btn.textContent='✓ Registrar';}}
