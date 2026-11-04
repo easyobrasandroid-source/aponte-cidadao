@@ -413,7 +413,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="ss-wrap" id="dw-steps"></div>
         <div style="background:var(--amber-light);border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:.5rem .75rem;font-size:11px;color:var(--amber)" id="dw-step-note"></div>
         <div id="dw-finalizar-box" style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:var(--radius-sm);padding:.75rem 1rem;margin-top:.75rem">
-          <span style="font-size:12px;color:var(--green);font-weight:500">Execução finalizada? <strong>Marque como concluído</strong></span>
+          <span style="font-size:12px;color:var(--green);font-weight:500">Atendimento finalizado? <strong>Registrar conclusão segura</strong></span>
           <div style="display:flex;gap:7px;flex-shrink:0">
             <button class="btn" style="background:#FFF8DC;color:#B8860B;border:1.5px solid #DAA520;font-size:12px;font-weight:700;padding:6px 13px;display:inline-flex;align-items:center;gap:5px" id="dw-acao-garantia" onclick="abrirModalGarantia()" title="Módulo LED com defeito coberto por garantia">⚡ Garantia LED</button>
             <button class="btn btn-concluir" id="dw-acao-concluir" onclick="abrirModalConcluir()">✅ Concluir</button>
@@ -448,13 +448,16 @@ tbody tr:last-child td{border-bottom:none;}
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header"><div class="modal-title">✅ Marcar como Concluído</div><button class="modal-close" onclick="closeModalConcluir()">✕</button></div>
     <div class="modal-body">
-      <div style="width:52px;height:52px;background:var(--green-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 1rem">✅</div>
-      <div class="field" style="margin-bottom:10px"><label>Observação de conclusão</label><textarea id="obs-conclusao" style="font-family:'Inter',sans-serif;font-size:13px;padding:9px 11px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);width:100%;resize:none;min-height:70px;outline:none" placeholder="Ex: Lâmpada trocada com sucesso."></textarea></div>
-      <div class="field"><label>Data / hora de conclusão</label><input type="datetime-local" id="dt-conclusao" style="font-family:'Inter',sans-serif;font-size:13px;padding:8px 11px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);width:100%;outline:none"></div>
+      <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:9px;padding:12px;color:#065F46;font-size:12px;line-height:1.6">
+        <strong>Concluir no Supabase V19 de homologação</strong>
+        <div id="v19-conclusao-alvo" style="margin-top:6px;word-break:break-word"></div>
+        <div style="margin-top:8px">Data, hora e responsável serão registrados pelo servidor. O histórico será criado automaticamente.</div>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:10px">Observações personalizadas de conclusão serão integradas posteriormente.</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModalConcluir()">Cancelar</button>
-      <button class="btn btn-concluir" onclick="confirmarConclusao()">✅ Confirmar conclusão</button>
+      <button class="btn btn-concluir" id="v19-btn-confirmar-conclusao" onclick="confirmarConclusao()">✅ Confirmar conclusão</button>
     </div>
   </div>
 </div>
@@ -1532,6 +1535,35 @@ function podeMudarStatus(c){
   if(CU.perfil==='garantia') return !!CU.consorcio_id && c.consorcio_id===CU.consorcio_id && c.status==='Aguardando Garantia LED' && !!c.garantia_tipo;
   return false;
 }
+// Pré-regras de interface (a autorização efetiva é sempre feita pela RPC do banco).
+function v19GarantiaLED(c){
+  return !!c && c.status==='Aguardando Garantia LED' &&
+    String(c.garantia_tipo||'').trim().toUpperCase()==='LED';
+}
+function v19PodeConcluir(c){
+  if(!CU||!c||!c._supaId||c.status==='Concluído'||c.completed_at)return false;
+  if(v19GarantiaLED(c)){
+    if(CU.perfil==='garantia')return !!CU.consorcio_id&&CU.consorcio_id===c.consorcio_id;
+    return CU.perfil==='empresa'&&!!CU.empresa_id&&!!CU.consorcio_id&&
+      CU.consorcio_id===c.consorcio_id&&CU.empresa_id===c.empresa_id;
+  }
+  if(c.status==='Aguardando Garantia LED'||String(c.garantia_tipo||'').trim())return false;
+  if(!['Recebido','Em programação','Em execução','Aguard. material',
+        'Aguardando material','Em atraso'].includes(c.status))return false;
+  if(CU.perfil==='master')return true;
+  if(CU.perfil==='consorcio')return !!CU.consorcio_id&&CU.consorcio_id===c.consorcio_id;
+  if(CU.perfil==='empresa')return !!CU.empresa_id&&!!CU.consorcio_id&&
+    CU.consorcio_id===c.consorcio_id&&CU.empresa_id===c.empresa_id;
+  return false;
+}
+function v19PassoPermitido(c,i){
+  if(i===4)return v19PodeConcluir(c);
+  if(!c||!podeMudarStatus(c)||c.completed_at||c.garantia_tipo||
+      c.status==='Concluído'||c.status==='Aguardando Garantia LED')return false;
+  const matriz={'Novo':[1],'Recebido':[1,2,3],'Em programação':[2,3],
+    'Em execução':[3],'Aguard. material':[2],'Aguardando material':[2],'Em atraso':[2]};
+  return (matriz[c.status]||[]).includes(i);
+}
 // ═══ DRAWER ═══
 function abrirDrawer(id){
   CC=DB.chamados.find(c=>c.id===id);if(!CC)return;
@@ -1549,20 +1581,19 @@ function abrirDrawer(id){
   // Step 0 = Recebido (automático, não clicável). Steps 1-4 são clicáveis
   const podeMudar = podeMudarStatus(c);
   document.getElementById('dw-steps').innerHTML=stepLbls.map((s,i)=>`
-    <div class="ss-item" ${i>0&&i<=3&&podeMudar&&c.status!=='Concluído'&&c.status!=='Aguardando Garantia LED'&&!c.garantia_tipo?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Alteração indisponível até integração segura da RPC V19"'} style="${i===0?'cursor:default;opacity:.85':i>0&&i<=3&&podeMudar&&c.status!=='Concluído'&&c.status!=='Aguardando Garantia LED'&&!c.garantia_tipo?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
+    <div class="ss-item" ${v19PassoPermitido(c,i)?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Alteração indisponível até integração segura da RPC V19"'} style="${i===0?'cursor:default;opacity:.85':v19PassoPermitido(c,i)?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
       <div class="ss-circle ${i<ci?'done':i===ci?'active':'idle'}">${i<ci?'✓':stepIcos[i]}</div>
       <div class="ss-label ${i<ci?'done':i===ci?'active':''}">${s}${i===0?'<br><span style="font-size:8px;color:var(--gray-400)">(automático)</span>':''}</div>
     </div>${i<4?`<div class="ss-line ${i<ci?'done':''}"></div>`:''}`).join('');
   document.getElementById('dw-step-note').textContent=`${c.status} — ${c.empresa||'Sem empresa'} · ${c.cidade}` +
     (podeMudar ? '' : ' · Somente leitura: mudança de status pelo gestor ou empresa responsável');
   const btnConcluir=document.getElementById('dw-acao-concluir');
-  if(btnConcluir) btnConcluir.style.display='none'; // Conclusão legada ainda bloqueada
+  if(btnConcluir) btnConcluir.style.display=v19PodeConcluir(c)?'':'none'; // Somente via RPC
   const btnGarantia=document.getElementById('dw-acao-garantia');
   if(btnGarantia) btnGarantia.style.display='none'; // Encaminhamento legado ainda bloqueado
   // Esconder também o aviso de conclusão quando as duas ações estão bloqueadas.
   const finalizarBox=document.getElementById('dw-finalizar-box');
-  if(finalizarBox) finalizarBox.style.display=
-    (btnConcluir?.style.display==='none' && btnGarantia?.style.display==='none')?'none':'flex';
+  if(finalizarBox) finalizarBox.style.display=v19PodeConcluir(c)?'flex':'none';
   document.getElementById('dw-dados').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
     <div><div class="card-title">Dados do chamado</div>
       <div class="drow"><span class="dlbl">Cidade</span><span class="dval">${c.cidade}</span></div>
@@ -1873,10 +1904,8 @@ let v19StatusBusy=false;
 async function alterarStatus(id,step){
   const c=DB.chamados.find(x=>x.id===id);
   if(!c||step===0)return;
-  if(![1,2,3].includes(step)){
-    showToast('🔒 A conclusão usa uma RPC diferente e ainda será integrada à interface.','aviso');
-    return;
-  }
+  if(step===4){ CC=c; abrirModalConcluir(); return; }
+  if(![1,2,3].includes(step))return;
   if(!podeMudarStatus(c)||c.status==='Concluído'||c.status==='Aguardando Garantia LED'||c.completed_at||c.garantia_tipo){
     showToast('🔒 O perfil ou estado do chamado não permite alterar esse status comum.','erro');
     return;
@@ -1912,10 +1941,11 @@ async function alterarStatus(id,step){
   }
 }
 function abrirModalConcluir(){
-  if(!podeMudarStatus(CC)){
-    showToast('🔒 Conclusão permitida somente ao gestor ou à empresa responsável.','erro');return;
+  if(!CC||!v19PodeConcluir(CC)||!SB_SESSION?.access_token){
+    showToast('🔒 Este perfil, status ou sessão não pode concluir este chamado.','erro');return;
   }
-  const now=new Date();document.getElementById('dt-conclusao').value=now.toISOString().slice(0,16);
+  const alvo=document.getElementById('v19-conclusao-alvo');
+  if(alvo)alvo.textContent='Protocolo: '+CC.protocolo+' | Status atual: '+CC.status;
   document.getElementById('modalConcluir').classList.add('open');
 }
 function closeModalConcluir(){document.getElementById('modalConcluir').classList.remove('open');}
@@ -1968,30 +1998,42 @@ async function confirmarGarantia(){
 }
 
 async function confirmarConclusao(){
-  if(!CC)return;
-  if(!podeMudarStatus(CC)){
-    showToast('🔒 Seu perfil não pode concluir esse chamado.','erro');return;
+  const c=CC;
+  if(!c||!v19PodeConcluir(c)||!SB_SESSION?.access_token){
+    showToast('🔒 Conclusão não autorizada para este perfil ou chamado.','erro');return;
   }
-  const now=new Date();
-  const dtStr=document.getElementById('dt-conclusao')?.value;
-  const completedAt=dtStr?new Date(dtStr).toISOString():now.toISOString();
-  const completedDate=new Date(completedAt);
-  const completedFmt=completedDate.toLocaleDateString('pt-BR')+' às '+completedDate.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  const snap={status:CC.status,sla:CC.sla,slaPct:CC.slaPct,completed_at:CC.completed_at};
-  CC.status='Concluído';CC.slaPct=100;CC.completed_at=completedAt;
-  const obs=document.getElementById('obs-conclusao').value||'Chamado concluído.';
-  if(!DB.historico[CC.id])DB.historico[CC.id]=[];
-  DB.historico[CC.id].push({s:'✅ Concluído',m:`${now.toLocaleString('pt-BR')} — ${CU?.nome||'Sistema'}`,o:`Concluído em ${completedFmt} por ${CU?.nome||'Sistema'}. ${obs}`,c:'#0D7A55'});
-  // GRAVA PRIMEIRO no banco. Só confirma se aceitou.
-  showToast('💾 Salvando no banco…','aviso');
-  const ok=await sbSaveChamado(CC);
-  if(!ok){ Object.assign(CC,snap); DB.historico[CC.id].pop(); showToast('❌ Falha ao gravar a conclusão no banco. Nada foi alterado.','erro'); return; }
-  await sbSaveHistorico(CC.protocolo, DB.historico[CC.id]||[]);
-  saveDB(DB);
-  document.getElementById('sb-badge').textContent=DB.chamados.filter(x=>x.status==='Em atraso').length;
-  showToast('✅ Chamado concluído e salvo no banco!','ok');
-  closeModalConcluir();abrirDrawer(CC.id);
-  refreshChamadosView();
+  if(v19StatusBusy)return;
+  const garantia=v19GarantiaLED(c);
+  const rpc=garantia?'v19_concluir_garantia':'v19_atualizar_status_chamado';
+  if(!window.confirm('Concluir definitivamente o protocolo '+c.protocolo+
+    ' no Supabase V19 de homologação? O banco gravará data, responsável e histórico.'))return;
+  v19StatusBusy=true;
+  const botao=document.getElementById('v19-btn-confirmar-conclusao');
+  if(botao){botao.disabled=true;botao.textContent='Concluindo...';}
+  try{
+    const payload=garantia?{p_chamado_id:c._supaId}:
+      {p_chamado_id:c._supaId,p_novo_status:'Concluído'};
+    // Transação única no banco; o trigger cria o histórico automaticamente.
+    const resp=await sbFetch('rpc/'+rpc,'POST',payload);
+    if(resp?.ok!==true||resp.status!=='Concluído'||!resp.completed_at)
+      throw new Error('RPC não confirmou o resultado. Atualize a página antes de qualquer nova tentativa.');
+    closeModalConcluir();
+    const sincronizou=await carregarChamadosDoBanco();
+    if(!sincronizou){
+      closeDrawer();
+      showToast('✅ Servidor confirmou conclusão. Pressione F5 para consultar o registro.','aviso');
+    }else{
+      refreshChamadosView();
+      if(DB.chamados.some(x=>x.id===c.id))abrirDrawer(c.id);else closeDrawer();
+      showToast('✅ Conclusão persistida com histórico automático.','ok');
+    }
+  }catch(e){
+    console.error('[V19] concluir via RPC:',e);
+    showToast('❌ Conclusão não confirmada: '+e.message,'erro');
+  }finally{
+    v19StatusBusy=false;
+    if(botao){botao.disabled=false;botao.textContent='✅ Confirmar conclusão';}
+  }
 }
 
 // ═══ MAPA ═══
