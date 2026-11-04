@@ -124,3 +124,12 @@ Próximo: **SQL 56** `sql/v19/56_AUDITORIA_FINAL_ESTOQUE_SOMENTE_LEITURA.sql` pr
 - Próximo portão: abrir a V19 pela branch isolada, usar chave `sb_publishable_` do projeto correto e fazer **smoke test apenas de leitura** (login de consórcio, dados do estoque, consulta de chamados, F5/logout/login). Não executar alterações pela interface antes de implementar as RPCs faltantes e testar os fluxos integrais. Depois focar gravações de equipes, abertura/edição de chamados, portal, SLA, fotos, relatórios e dashboards.
 
 **A V19 NÃO está pronta para produção. A V18 deve permanecer intacta até regressão geral e piloto.**
+
+## Smoke test da interface V19 + histórico real do estoque (2026-11-04)
+
+- Evidência visual do usuário: login Consórcio Alfa carregou dashboard do Supabase, mostrando 6 chamados (3 concluídos, 1 em programação/execução) e aviso de SLA ainda não homologado.
+- Evidência visual do usuário: tela **Estoque** exibiu exatamente um material fictício `V19-TESTE-ESTOQUE-ALFA-36`, contratado 25, disponível 14 (56%), preço R$50, estoque crítico 0, três movimentos do tipo saída/consumo no mês. **Leitura de estoque aprovada nos dados vistos.**
+- Revisão de código confirmou que `teste-v19/v19.js` já sobrescreve `sbSaveMaterial` para RPC `v19_salvar_material` e `salvarMovimentacao` para RPC `v19_movimentar_estoque`; ainda não testadas na interface principal, apesar de homologadas em painéis separados.
+- **Bug de histórico corrigido** na branch `desenvolvimento-v19`: o botão Histórico passou a consultar o ledger `movimentacoes` (incluindo devoluções e estornos), não `chamado_materiais` (onde itens estornados são apagados). Também envia observação digitada pelo operador à RPC de movimentação.
+- Compilação estática de `v19.js` com JavaScript `new Function` passou. **Ainda não foi testado no navegador pelo usuário** após a correção; rebaixar o ZIP atualizado e validar apenas leitura pelo botão Histórico, esperando sete movimentações do material.
+- Não realizar ajustes pelo frontend até a próxima pré-verificação e teste controlado de RPC em registro fictício novo. V18 preservada.
