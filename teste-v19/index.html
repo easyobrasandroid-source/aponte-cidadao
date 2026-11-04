@@ -507,9 +507,9 @@ tbody tr:last-child td{border-bottom:none;}
 // ═══ CONFIG CENTRAL — Supabase (ÚNICO ponto de configuração) ═══
 // NUNCA colocar service_role / segredo JWT aqui. Apenas a anon key (pública).
 //
-// PRODUÇÃO: projeto Supabase `aponte-cidadao` (ref kvzcturkjibmsyjqafbt).
-// A ANON_KEY abaixo é a chave PÚBLICA (role=anon), segura para o navegador —
-// o isolamento real é garantido pelo RLS no banco.
+// HOMOLOGAÇÃO: apenas o Supabase V19 isolado; nunca apontar para produção.
+// Chave sb_publishable_ pedida ao usuário e mantida apenas nesta aba/sessão.
+// A autorização real continua dependendo do JWT Auth + RLS/RPC do banco.
 // Projeto de HOMOLOGACAO V19 exclusivo; nao utilizar credenciais V18.
 const V19_PROJECT_REF = 'xurrhczvyqpwyjemight';
 const V19_PROJECT_URL = 'https://' + V19_PROJECT_REF + '.supabase.co';
