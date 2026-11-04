@@ -75,3 +75,19 @@ Evidências: seis screenshots do usuário com resultados finais.
 - SQL 42 executado (resultado informado): chamado `V19-TESTE-CONSUMO-ALFA-B-1`, no Município Alfa 1, atribuído à Empresa Alfa B, status `Em execução`; material `V19-TESTE-ESTOQUE-ALFA-36` com disponível **14**, contratado **25**, nenhum consumo ou movimento vinculado ao chamado.
 - Painel HTML para **Testes 43–47** gerado como artefato desta conversa, com Auth real das contas Consórcio Alfa, Empresa Alfa A/B e Beta A, sem armazenamento de credenciais. Etapas: pré-verificação, bloqueio da empresa não atribuída, consumo autorizado de 2 unidades (saldo final esperado 12), rejeição por saldo insuficiente (100 unidades), isolamento entre consórcios. **Testes ainda não executados pelo usuário**.
 - O SQL 41 não implementa edição/estorno de consumo: estes fluxos ainda exigem migração específica e homologação.
+
+## Homologação de consumo — Testes 43–47 aprovados (2026-11-04)
+
+Evidência: cinco capturas de tela fornecidas pelo usuário.
+
+- **Teste 43**: pré-verificação de Gestor Alfa, Empresa Alfa B (atribuída) e Alfa A (não atribuída); material com saldo 14/25, 3 movimentações e nenhum consumo inicial.
+- **Teste 44**: Alfa A bloqueada (HTTP 403); saldo 14/14 e nenhum novo consumo/movimento/histórico.
+- **Teste 45**: Alfa B consumiu 2 unidades a R$50 cada. Saldo **14→12**; contratado 25; movimentações **3→4**; itens de consumo **0→1**; histórico do chamado **0→1**; custo R$100.
+- **Teste 46**: tentativa de consumir 100 unidades retornou HTTP 400 `SALDO_INSUFICIENTE`; quantidades, itens, movimentos e histórico preservados.
+- **Teste 47**: Empresa Beta A de outro consórcio não enxerga chamados ou materiais Alfa e recebeu HTTP 403 tentando consumir; dados preservados.
+
+### Próximo passo: SQL 48 / edição e estorno
+
+- Arquivo: `sql/v19/48_EDICAO_ESTORNO_CONSUMO_HOMOLOGACAO.sql` criado na branch; **execução ainda pendente de confirmação do usuário**.
+- Instala `editar_material_chamado(uuid,numeric)` e `remover_material_chamado(uuid)`, com autorização real, travas de transação, histórico e alteração de saldo atômica.
+- Cenário planejado após os cinco diagnósticos OK: Alfa A deve ser bloqueada; Alfa B edita 2→3 (saldo 12→11), reduz 3→1 (saldo 11→13), e estorna 1 unidade (saldo 13→14), mantendo trilha de movimentos/histórico. A edição de item removido deve ser bloqueada. Não executar esses cenários antes de instalar e verificar o SQL 48.
