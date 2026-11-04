@@ -439,7 +439,7 @@ tbody tr:last-child td{border-bottom:none;}
   <div class="dw-footer">
     <button class="btn btn-ghost" onclick="closeDrawer()">Fechar</button>
     <button class="btn btn-ghost" onclick="if(CC){const w=window.open('','_blank');w.document.write('<pre>'+JSON.stringify(CC,null,2)+'</pre>');w.print();}">🖨 Imprimir</button>
-    <button class="btn btn-save" id="dw-btn-salvar" onclick="salvarDrawer()">💾 Salvar</button>
+    <button class="btn btn-save" id="dw-btn-salvar" style="display:none" disabled title="Edição de chamado requer RPC V19 homologada">💾 Salvar</button>
   </div>
 </div>
 
@@ -1242,7 +1242,7 @@ function vChamados(b,t,a){
   // Perfil garantia não cria chamados — só executa
   a.innerHTML= CU?.perfil==='garantia'
     ? `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button>`
-    : `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><button class="btn btn-save" onclick="vNovoChamado()">+ Novo chamado</button>`;
+    : `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><span class="btn btn-ghost" style="opacity:.6;cursor:not-allowed" title="Criação de chamado aguarda RPC V19">+ Novo chamado (em integração)</span>`;
   let SEL=new Set();
   // Aplicar filtros vindos do dashboard
   const navSt=NAV_FILTERS.status||'';
@@ -1378,37 +1378,8 @@ function vChamados(b,t,a){
     else SEL.clear();
     updateBulkBar();
   };
-  window.alterarStatusLote=function(novoStatus){
-    if(SEL.size===0) return;
-    const now=new Date();
-    const nowISO=now.toISOString();
-    const nowStr=now.toLocaleString('pt-BR');
-    const statusIcons={'Em programação':'📋','Em execução':'⚡','Aguardando Garantia LED':'⚡','Concluído':'✅'};
-    const statusCores={'Em programação':'#B45309','Em execução':'#D97706','Aguardando Garantia LED':'#B8860B','Concluído':'#0D7A55'};
-    let count=0;
-    SEL.forEach(id=>{
-      const c=DB.chamados.find(x=>x.id===id);
-      if(!c) return;
-      // Não permite alterar chamados já concluídos para status intermediários
-      if(c.status==='Concluído' && novoStatus!=='Aguardando Garantia LED') return;
-      const antigo=c.status;
-      c.status=novoStatus;
-      if(novoStatus==='Concluído'){c.sla=0;c.slaPct=100;c.completed_at=nowISO;}
-      if(novoStatus==='Aguardando Garantia LED'){c.sla_pausado=true;}
-      if(!DB.historico[id]) DB.historico[id]=[];
-      const ico=statusIcons[novoStatus]||'•';
-      DB.historico[id].push({
-        s:`${ico} ${novoStatus} (em lote)`,
-        m:`${nowStr} — ${CU?.nome||'Sistema'}`,
-        o:`Status alterado de "${antigo}" para "${novoStatus}" em lote por ${CU?.nome||'Sistema'}.`,
-        c:statusCores[novoStatus]||'#1251A3'
-      });
-      count++;
-    });
-    saveDB(DB);
-    document.getElementById('sb-badge').textContent=DB.chamados.filter(x=>x.status==='Em atraso').length;
-    SEL.clear();
-    showView('chamados');
+  window.alterarStatusLote=function(){
+    showToast('🔒 Operação em lote indisponível até existir RPC V19 homologada.','aviso');
   };
   window.cancelarSel=function(){SEL.clear();updateBulkBar();};
 
@@ -1578,16 +1549,16 @@ function abrirDrawer(id){
   // Step 0 = Recebido (automático, não clicável). Steps 1-4 são clicáveis
   const podeMudar = podeMudarStatus(c);
   document.getElementById('dw-steps').innerHTML=stepLbls.map((s,i)=>`
-    <div class="ss-item" ${i>0&&podeMudar&&(CU?.perfil!=='garantia'||i===4)?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Seu perfil pode consultar, mas não alterar o status"'} style="${i===0?'cursor:default;opacity:.85':podeMudar?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
+    <div class="ss-item" ${i>0&&i<=3&&podeMudar&&c.status!=='Concluído'&&c.status!=='Aguardando Garantia LED'&&!c.garantia_tipo?`onclick="alterarStatus('${id}',${i})"`:i===0?'title="Status automático do sistema"':'title="Alteração indisponível até integração segura da RPC V19"'} style="${i===0?'cursor:default;opacity:.85':i>0&&i<=3&&podeMudar&&c.status!=='Concluído'&&c.status!=='Aguardando Garantia LED'&&!c.garantia_tipo?'cursor:pointer':'cursor:not-allowed;opacity:.6'}">
       <div class="ss-circle ${i<ci?'done':i===ci?'active':'idle'}">${i<ci?'✓':stepIcos[i]}</div>
       <div class="ss-label ${i<ci?'done':i===ci?'active':''}">${s}${i===0?'<br><span style="font-size:8px;color:var(--gray-400)">(automático)</span>':''}</div>
     </div>${i<4?`<div class="ss-line ${i<ci?'done':''}"></div>`:''}`).join('');
   document.getElementById('dw-step-note').textContent=`${c.status} — ${c.empresa||'Sem empresa'} · ${c.cidade}` +
     (podeMudar ? '' : ' · Somente leitura: mudança de status pelo gestor ou empresa responsável');
   const btnConcluir=document.getElementById('dw-acao-concluir');
-  if(btnConcluir) btnConcluir.style.display=podeMudar?'':'none';
+  if(btnConcluir) btnConcluir.style.display='none'; // Conclusão legada ainda bloqueada
   const btnGarantia=document.getElementById('dw-acao-garantia');
-  if(btnGarantia) btnGarantia.style.display=['master','consorcio'].includes(CU?.perfil)?'':'none';
+  if(btnGarantia) btnGarantia.style.display='none'; // Encaminhamento legado ainda bloqueado
   document.getElementById('dw-dados').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
     <div><div class="card-title">Dados do chamado</div>
       <div class="drow"><span class="dlbl">Cidade</span><span class="dval">${c.cidade}</span></div>
@@ -1618,24 +1589,8 @@ function abrirDrawer(id){
   showDTab('resumo',document.querySelector('.dtab'));
 }
 async function salvarDrawer(){
-  if(!CC){showToast('⚠ Nenhum chamado selecionado.','aviso');return;}
-  const btn=document.getElementById('dw-btn-salvar');
-  if(btn){btn.disabled=true;btn.textContent='Salvando…';}
-  if(!DB.historico[CC.id]) DB.historico[CC.id]=[];
-  // GRAVA PRIMEIRO no banco. Só aplica local e confirma se aceitou.
-  const ok=await sbSaveChamado(CC);
-  if(!ok){
-    if(btn){btn.disabled=false;btn.textContent='💾 Salvar';}
-    showToast('❌ Falha ao gravar no banco. As alterações NÃO foram salvas — verifique a conexão e tente de novo.','erro');
-    return;
-  }
-  await sbSaveHistorico(CC.protocolo, DB.historico[CC.id]||[]);
-  const idx=DB.chamados.findIndex(c=>c.id===CC.id);
-  if(idx>=0) DB.chamados[idx]={...DB.chamados[idx],...CC};
-  saveDB(DB);
-  refreshChamadosView();
-  showToast('✅ Chamado salvo no banco!','ok');
-  if(btn){btn.disabled=false;btn.textContent='💾 Salvar';}
+  showToast('🔒 Edição geral do chamado bloqueada até integração de RPC específica na V19.','aviso');
+  return false;
 }
 async function renderMateriaisChamado(){
   const cont = document.getElementById('dw-materiais-lista');
@@ -1910,35 +1865,47 @@ const s2s=['Recebido','Em programação','Em execução','Aguard. material','Con
 // Step 0 = Recebido é automático — bloquear clique manual
 const s2sLabel={'Recebido':'Recebido','Em programação':'Em programação','Em execução':'Em execução','Aguard. material':'Aguard. material','Concluído':'Concluído','Aguardando Garantia LED':'⚡ Garantia LED'};
 const s2c=['#1251A3','#B45309','#0D7A55','#6D28D9','#10B981'];
+let v19StatusBusy=false;
 async function alterarStatus(id,step){
-  if(CU?.perfil==='garantia'){
-    if(step===4){const c=DB.chamados.find(x=>x.id===id);if(c&&podeMudarStatus(c)){CC=c;abrirModalConcluir();return;}}
-    showToast('Garantia LED só pode concluir chamados de garantia atribuídos.','erro');return;
-  }
-  if(step===0) return; // "Recebido" é status automático — não permite alteração manual
-  const c=DB.chamados.find(x=>x.id===id);if(!c)return;
-  if(!podeMudarStatus(c)){
-    showToast('🔒 Seu perfil não pode alterar o status. Solicite ao gestor do consórcio ou à empresa responsável.','erro');
+  const c=DB.chamados.find(x=>x.id===id);
+  if(!c||step===0)return;
+  if(![1,2,3].includes(step)){
+    showToast('🔒 A conclusão usa uma RPC diferente e ainda será integrada à interface.','aviso');
     return;
   }
-  const statusAnterior=c.status;
-  c.status=s2s[step];
-  if(!DB.historico[id])DB.historico[id]=[];
-  DB.historico[id].push({s:s2s[step],m:`${new Date().toLocaleString('pt-BR')} — ${CU?.nome||'Sistema'}`,o:'',c:s2c[step]});
-  // GRAVA PRIMEIRO no banco. Só confirma se o banco aceitou.
-  showToast('💾 Salvando no banco…','aviso');
-  const ok=await sbSaveChamado(c);
-  if(!ok){
-    c.status=statusAnterior; DB.historico[id].pop();   // reverte
-    showToast('❌ Falha ao gravar no banco. O status NÃO foi alterado — verifique a conexão e tente de novo.','erro');
-    abrirDrawer(id); refreshChamadosView(); return;
+  if(!podeMudarStatus(c)||c.status==='Concluído'||c.status==='Aguardando Garantia LED'||c.completed_at||c.garantia_tipo){
+    showToast('🔒 O perfil ou estado do chamado não permite alterar esse status comum.','erro');
+    return;
   }
-  await sbSaveHistorico(c.protocolo, DB.historico[id]||[]);
-  saveDB(DB);
-  document.getElementById('sb-badge').textContent=DB.chamados.filter(x=>x.status==='Em atraso').length;
-  showToast('✅ Status salvo no banco: '+s2s[step],'ok');
-  abrirDrawer(id);
-  refreshChamadosView();
+  if(!c._supaId||!SB_SESSION?.access_token){
+    showToast('🔒 Sessão ou UUID indisponível. Atualize a página e entre novamente.','erro');
+    return;
+  }
+  const novo=s2s[step];
+  if(!window.confirm('Alterar '+c.protocolo+' para '+novo+'? O banco registrará o histórico automaticamente.'))return;
+  if(v19StatusBusy)return;
+  v19StatusBusy=true;
+  try{
+    const resp=await sbFetch('rpc/v19_atualizar_status_chamado','POST',{
+      p_chamado_id:c._supaId,p_novo_status:novo
+    });
+    if(resp?.ok!==true||resp.status!==novo)
+      throw new Error('Resposta da RPC não confirmou o novo status.');
+    // Não inserir histórico manualmente: SQL 17/28 registra por trigger.
+    const sincronizado=await carregarChamadosDoBanco();
+    if(!sincronizado){
+      showToast('✅ Operação confirmada pelo servidor. Pressione F5 para atualizar a tela.','aviso');
+    }else{
+      refreshChamadosView();
+      if(DB.chamados.some(x=>x.id===id))abrirDrawer(id);
+      showToast('✅ Status atualizado no banco para '+novo,'ok');
+    }
+  }catch(e){
+    console.error('[V19] status via RPC:',e);
+    showToast('❌ Status não confirmado: '+e.message,'erro');
+  }finally{
+    v19StatusBusy=false;
+  }
 }
 function abrirModalConcluir(){
   if(!podeMudarStatus(CC)){
