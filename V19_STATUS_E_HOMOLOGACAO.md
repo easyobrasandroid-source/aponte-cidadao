@@ -91,3 +91,9 @@ Evidência: cinco capturas de tela fornecidas pelo usuário.
 - Arquivo: `sql/v19/48_EDICAO_ESTORNO_CONSUMO_HOMOLOGACAO.sql` criado na branch; **execução ainda pendente de confirmação do usuário**.
 - Instala `editar_material_chamado(uuid,numeric)` e `remover_material_chamado(uuid)`, com autorização real, travas de transação, histórico e alteração de saldo atômica.
 - Cenário planejado após os cinco diagnósticos OK: Alfa A deve ser bloqueada; Alfa B edita 2→3 (saldo 12→11), reduz 3→1 (saldo 11→13), e estorna 1 unidade (saldo 13→14), mantendo trilha de movimentos/histórico. A edição de item removido deve ser bloqueada. Não executar esses cenários antes de instalar e verificar o SQL 48.
+
+## SQL 48 instalado — Edição/estorno de consumo (2026-11-04)
+
+- Usuário confirmou 5/5 `OK`: RPCs `editar_material_chamado(uuid,numeric)` e `remover_material_chamado(uuid)` instaladas; executáveis por `authenticated`, negadas a `anon`, escrita direta negada.
+- Foi preparado o painel HTML **Aponte_V19_Painel_Edicao_Estorno_Testes_49_a_55.html** (artefato local da conversa). Realiza pré-verificação, bloqueio de Empresa Alfa A, edição Alfa B 2→3 (saldo 12→11), edição 3→1 (saldo 11→13), bloqueio de estorno por Alfa A, estorno autorizado (saldo 13→14), bloqueio de estorno duplicado. Os testes são sequenciais, com verificações de movimentações, auditoria e totais.
+- **Testes 49–55 ainda pendentes de execução pelo usuário.** Não reaplicar SQL 48 nem recriar fixtures. Caso falhe, não repetir a operação antes de auditar banco.
