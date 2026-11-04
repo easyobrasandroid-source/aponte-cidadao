@@ -114,7 +114,7 @@ BEGIN
   ELSE
     SELECT m.consorcio_id INTO v_consorcio_material
     FROM public.materiais m
-    WHERE m.id=p_material_id
+    WHERE m.id=p_material_id AND m.status='ativo'
     FOR UPDATE;
 
     IF NOT FOUND OR v_consorcio_material IS DISTINCT FROM p_consorcio_id THEN
@@ -175,9 +175,9 @@ BEGIN
       CASE WHEN v_delta>0 THEN 'entrada' ELSE 'saida' END,
       abs(v_delta),v_nome_usuario,v_uid,
       CASE WHEN v_criado THEN 'cadastro_inicial' ELSE 'ajuste_catalogo' END,
-      'Saldo anterior: '||v_saldo_anterior||
+      'Saldo anterior: '||coalesce(v_saldo_anterior,0)||
       '; novo saldo: '||p_quantidade_disponivel||
-      '; contratado anterior: '||v_contratado_anterior||
+      '; contratado anterior: '||coalesce(v_contratado_anterior,0)||
       '; novo contratado: '||p_quantidade_contratada
     );
   END IF;
@@ -229,7 +229,8 @@ BEGIN
     RAISE EXCEPTION 'NAO_AUTENTICADO' USING ERRCODE='42501';
   END IF;
 
-  IF p_material_id IS NULL OR p_tipo NOT IN ('entrada','saida')
+  IF p_material_id IS NULL OR p_tipo IS NULL
+     OR p_tipo NOT IN ('entrada','saida')
      OR p_quantidade IS NULL OR p_quantidade<=0
      OR p_quantidade>9999999999
      OR round(p_quantidade,2)<>p_quantidade THEN
