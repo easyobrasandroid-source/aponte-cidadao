@@ -111,3 +111,16 @@ Evidência: sete screenshots fornecidos pelo usuário. Resultado de aplicação 
 - 55: estorno duplicado negado HTTP 403 (`ITEM_NAO_DISPONIVEL`); saldos, movimentos e histórico preservados — OK.
 
 Próximo: **SQL 56** `sql/v19/56_AUDITORIA_FINAL_ESTOQUE_SOMENTE_LEITURA.sql` preparado, **não executado pelo usuário**, reconciliará saldos x ledger do material fictício, linhas ativas e integridade entre consórcios. Após isso, priorizar concorrência e integração com UI V19 em vez de multiplicar páginas HTML avulsas. Não fazer deploy de produção ainda.
+
+## SQL 56 e início da integração frontend (2026-11-04)
+
+- **SQL 56 concluído com 11/11 OK** (CSV fornecido pelo usuário): 1 material, 1 estoque, saldo 14 e contratado 25, 7 movimentos; saldo reconstituído 14 igual ao banco; 1 chamado ativo Em execução, 0 itens de consumo, 4 eventos de histórico; nenhuma divergência de consórcio ou saldo inválido.
+- **Bloqueador crítico descoberto** durante inspeção: `teste-v19/index.html` ainda apontava para a URL/chave pública da V18. Isso foi corrigido **somente na branch `desenvolvimento-v19`**, sem tocar `main`.
+- Configuração agora fixa o Supabase de homologação `https://xurrhczvyqpwyjemight.supabase.co`, requer chave pública `sb_publishable_` fornecida pelo operador na abertura (guardada apenas em sessionStorage para aba), e sessões Auth em armazenamento de chave `aponte_v19_homolog_session`, sem compartilhar tokens da V18.
+- Cabeçalho `Authorization` agora só é enviado quando houver JWT da sessão de usuário; a chave `sb_publishable_` vai no cabeçalho `apikey` (compatível com o formato opaco atual).
+- Aplicação da V19 bloqueia por padrão `POST/PATCH/DELETE` em tabelas via `sbFetch`, permitindo apenas POST às RPCs previamente instaladas e homologadas. Chamadas antigas de escrita falharão de forma explícita; **não significa que a interface está integrada por completo**.
+- Removido mecanismo residual de popular estoque com seed: se o catálogo estiver vazio, permanece vazio.
+- Bloco `<script>` principal de `teste-v19/index.html` foi compilado com `new Function` em ambiente de ferramenta e passou **somente verificação de sintaxe**; nenhum teste em navegador real, CI ou Supabase foi executado para essa alteração.
+- Próximo portão: abrir a V19 pela branch isolada, usar chave `sb_publishable_` do projeto correto e fazer **smoke test apenas de leitura** (login de consórcio, dados do estoque, consulta de chamados, F5/logout/login). Não executar alterações pela interface antes de implementar as RPCs faltantes e testar os fluxos integrais. Depois focar gravações de equipes, abertura/edição de chamados, portal, SLA, fotos, relatórios e dashboards.
+
+**A V19 NÃO está pronta para produção. A V18 deve permanecer intacta até regressão geral e piloto.**
