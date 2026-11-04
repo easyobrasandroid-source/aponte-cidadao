@@ -152,3 +152,10 @@ Capturas do usuário para o protocolo `V19-TESTE-CONSUMO-ALFA-B-1` confirmaram:
 - Verificação estática de sintaxe do script inline passou; **nenhum teste da nova interface em navegador ou Supabase foi executado** após o commit. O operador precisa baixar novo ZIP antes de testar.
 - Próximo teste isolado e seguro: consórcio Alfa abrir o chamado fictício **`V19-A-A`**, que permanece `Recebido` conforme captura de 2026-11-04, escolher `Em programação`, confirmar uma única vez e validar status persistente após F5 e 1 histórico automático. Fazer pré-leitura antes de mudar, pois dados de teste podem ter mudado. Não usar o protocolo `V19-B-1` para esse primeiro teste.
 - NÃO APLICAR EM PRODUÇÃO; V18 intocada.
+
+## Status via interface: primeiro teste com persistência e histórico (2026-11-04)
+
+- Usuário aplicou **Recebido → Em programação** ao chamado fictício `V19-TESTE-RLS-ALFA-A` (listagem `V19-A-A`) usando a interface `teste-v19/index.html`, autenticado como Gestor Consórcio Alfa.
+- A interface exibiu status atualizado; usuário pressionou F5 e apresentou print mostrando o status persistente e a aba Histórico com **1 evento** `Recebido → Em programação`, responsável **Gestor Consórcio Alfa**, horário **04/11/2026 12:45:04** (horário apresentado no navegador).
+- **Teste funcional de status via RPC aprovado no cenário específico**. Próximo teste seguro com a mesma fixture: **Em programação → Em execução**; não concluir e não acionar garantia.
+- Ajuste de UX: `index.html` agora esconde a faixa `Execução finalizada? Marque como concluído` enquanto os botões legados de conclusão e garantia estão bloqueados (commit `ef0515b8618ccd0ab0deece7a1570efaa279a62c`). Alteração ainda não testada no navegador; vale apenas para quem baixar versão nova. A versão local anterior continua habilitada para teste da RPC de status comum.
