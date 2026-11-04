@@ -133,3 +133,13 @@ Próximo: **SQL 56** `sql/v19/56_AUDITORIA_FINAL_ESTOQUE_SOMENTE_LEITURA.sql` pr
 - **Bug de histórico corrigido** na branch `desenvolvimento-v19`: o botão Histórico passou a consultar o ledger `movimentacoes` (incluindo devoluções e estornos), não `chamado_materiais` (onde itens estornados são apagados). Também envia observação digitada pelo operador à RPC de movimentação.
 - Compilação estática de `v19.js` com JavaScript `new Function` passou. **Ainda não foi testado no navegador pelo usuário** após a correção; rebaixar o ZIP atualizado e validar apenas leitura pelo botão Histórico, esperando sete movimentações do material.
 - Não realizar ajustes pelo frontend até a próxima pré-verificação e teste controlado de RPC em registro fictício novo. V18 preservada.
+
+## Smoke test das abas Histórico e Materiais do chamado (2026-11-04)
+
+Capturas do usuário para o protocolo `V19-TESTE-CONSUMO-ALFA-B-1` confirmaram:
+
+- Aba Histórico: **4 eventos reais** exibidos (consumo, edição para 3, devolução para 1 e estorno integral), todos associados à Empresa Alfa B, no status `Em execução`. Nota de UX: títulos repetem o status `Em execução` em vez de descrever o tipo de evento; observações permitem entender a ação.
+- Aba Materiais: **nenhum item ativo** após o estorno, coerente com os Testes 54/55 e SQL 56.
+- **Leitura do drawer aprovada nesse cenário.** Ainda não equivale a homologação de alterações por essa interface.
+- Auditoria de código: `alterarStatus`, `confirmarConclusao`, `confirmarGarantia`, `salvarDrawer` e operações em lote têm trechos do fluxo legado que recorrem a `sbSaveChamado`/gravação direta. O bloqueio V19 de `sbFetch` evita persistência indevida, mas os botões não estão homologados. **Não executar** ações de status/conclusão/garantia/salvar, nem lote, até substituição por RPCs V19 adequadas. RPC de status comum existente: `v19_atualizar_status_chamado(p_chamado_id,p_novo_status)`. RPC de conclusão de garantia existente: `v19_concluir_garantia(p_chamado_id)`.
+- Próxima validação imediata sem escrita: testar busca e filtro do chamado com resultado conhecido e limpar filtro. Depois integrar botões de status com origem de verdade no Supabase e histórico via trigger, usando novo chamado sintético para testes de escrita.
