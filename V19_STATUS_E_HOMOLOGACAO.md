@@ -54,3 +54,17 @@
 - SQL 34: as quatro RPCs de estoque/consumo consultadas não estavam instaladas; as quatro tabelas estavam vazias, sem anomalias estruturais detectáveis nesses dados.
 - SQL 35: o usuário confirmou 5/5 diagnósticos **OK** para instalação da RPC de cadastro, movimentação manual, bloqueio anon e DML direto.
 - Próximo: painel de Testes 36–40 preparado localmente — cadastro fictício pela conta Consórcio Alfa, tentativa indevida de Empresa Alfa A, entrada +5, saída -3 e retirada maior que saldo. **Ainda não executado pelo usuário.** Consumo por chamado e isolamento entre consórcios permanecem pendentes.
+
+## Homologação administrativa de estoque — Testes 36 a 40 (2026-11-04)
+
+Evidências: seis screenshots do usuário com resultados finais.
+
+- **Teste 36 aprovado:** material fictício `V19-TESTE-ESTOQUE-ALFA-36` cadastrado no Consórcio Alfa, 20 unidades contratadas, 12 disponíveis, com movimento inicial `entrada 12`.
+- **Teste 37 aprovado:** Empresa Alfa A enxerga saldo, mas a RPC de ajuste manual retornou HTTP 403; saldo e histórico inalterados.
+- **Teste 38 aprovado:** entrada +5: disponível 12 → 17; contratado 20 → 25; movimentos 1 → 2.
+- **Teste 39 aprovado:** saída -3: disponível 17 → 14; contratado mantém 25; movimentos 2 → 3.
+- **Teste 40 aprovado:** tentativa de retirar 100 retornou HTTP 400 `SALDO_INSUFICIENTE`, sem alterar saldo/contratado/histórico.
+
+**Não confundir este escopo com homologação integral de estoque.** Ainda faltam consumir material por chamado, edição/estorno, concorrência real de saldos e isolamento entre consórcios.
+
+- **SQL 41 preparado, NÃO confirmado como executado:** `sql/v19/41_CONSUMO_ATOMICO_MATERIAL_CHAMADO_HOMOLOGACAO.sql`. Implementa a RPC `consumir_material_chamado(uuid,uuid,numeric)` sem sobrescrever SQL35, com verificação de Auth, empresa atribuída/cidade/consórcio, status ativo, saldo suficiente e lançamento em três tabelas na mesma transação.
