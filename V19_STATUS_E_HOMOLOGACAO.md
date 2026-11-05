@@ -346,3 +346,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Aprovado:** segregação de leitura de configuração entre os consórcios na interface Master. Não equivale a teste de gestor Alfa tentando editar Beta via RPC com seu JWT.
 - Encontrado erro de UX: aviso sugeria executar novamente SQL59 apesar de ele só criar a regra de Alfa e falhar se reexecutado. Corrigido `teste-v19/v19-config.js` na branch desenvolvimento-v19 (commit `f7225ad7df06e95fa1d5c3daf91ffa5b6fa69ffe`) para avisar que Beta não tem regra própria e não orientar repetição do SQL59. **Mudança ainda não presente na cópia ZIP local do usuário.**
 - Próximo passo visual único: entrar como **Gestor Consórcio Alfa**, abrir menu SLA, expandir seletor de consórcios e observar se oferece apenas o Alfa; não alterar valores. O isolamento de escrita por JWT de consórcio não será considerado provado apenas com esse teste de interface.
+
+## SLA — Gestor Alfa vê apenas o próprio consórcio no seletor (05/11/2026)
+
+- Print do operador, autenticado como **Gestor Consórcio Alfa**, no menu SLA, mostra seletor aberto com **apenas uma opção**: `TESTE V19 - Consorcio Alfa`.
+- Valores permanecem em **2 dias corridos urbano / 5 dias corridos rural**; campos de edição e botão Salvar para o próprio consórcio.
+- **APROVADO: isolamento de seleção e leitura de consórcios no frontend** para Gestor Alfa. Não inferir isolamento de escrita por JWT para consórcio Beta a partir da lista do seletor; o backend bloqueia esse caso pelo código SQL59, mas aguarda teste com identidade real.
+- Próximo ensaio seguro: obter UUID do Consórcio Beta por consulta **somente leitura** no SQL Editor e usá-lo em tentativa com dias inválidos para testar o bloqueio `CONSORCIO_NAO_AUTORIZADO`, sem alterar regras.
