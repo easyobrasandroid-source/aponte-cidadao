@@ -331,3 +331,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - O código do diagnóstico envia `p_urb_dias:0`/`p_rur_dias:0`, valores sempre inválidos, e só marca APROVADO se a resposta inclui `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO`. A validação de perfil antecede a de prazo na RPC SQL59; nenhum prazo é gravável nesse teste.
 - **Aprovado para esse JWT:** bloqueio de edição por perfil Garantia pelo backend, além do bloqueio visual já observado. Não generalizar para outros perfis ou consórcios sem teste.
 - Próximo teste: **Empresa Alfa B** no mesmo ZIP atualizado, página SLA, clicar botão de diagnóstico e capturar resposta; não alterar prazos.
+
+## SLA — teste negativo com JWT da Empresa Alfa B aprovado
+
+- Captura de tela do operador logado como `Empresa Alfa B`, na V19 de homologação, mostra `Padrão geral` com **2 dias urbanos/5 dias rurais** e nenhum campo de edição de SLA.
+- O botão de diagnóstico `Testar bloqueio de edição pelo banco` foi executado; a tela apresentou **“APROVADO: o Supabase recusou a RPC para este perfil.”**
+- Este diagnóstico envia `p_urb_dias=0` e `p_rur_dias=0` para a `v19_salvar_sla_padrao`; a UI somente considera aprovado quando o erro da RPC é `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO`. O SQL 59 verifica o perfil antes de validar os valores, e 0 não poderia ser salvo.
+- **Aprovada negativa por JWT Empresa Alfa B**; somada à negativa por JWT Técnico Garantia Alfa, e aos testes positivos de Master e Gestor Consórcio Alfa com persistência.
+- O isolamento de gestor de outro consórcio e a atribuição automática da regra `PADRAO_GERAL` a novos chamados seguem **pendentes**. O teste não comprova todos os papéis ou todos os consórcios.
