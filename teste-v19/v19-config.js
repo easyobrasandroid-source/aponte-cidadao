@@ -101,48 +101,105 @@ window.v19SalvarPortal=async function(){
   finally{btn.disabled=false;btn.textContent='💾 Salvar configurações';}
 };
 
+// Configuração global de SLA. Valores em dias na UI e horas na tabela.
+// As verificações efetivas de permissão são realizadas pelo backend.
+let slaSaving=false;
 window.vSLA=async function(b,t,a,consId){
-  t.textContent='Configuração de SLA';a.innerHTML='';
+  t.textContent='Configuração de SLA'; a.innerHTML='';
   b.innerHTML='<div class="card">Lendo prazos do Supabase…</div>';
   try{
     consorcios=await carregarConsorcios();
     selectedCons=valid(consId)?consId:(valid(selectedCons)?selectedCons:consorcios[0]?.id);
-    if(!selectedCons)throw new Error('Nenhum consórcio disponível.');
+    if(!selectedCons||!consorcios.some(c=>c.id===selectedCons))
+      throw new Error('Consórcio não disponível para este usuário.');
     const rows=await sbSelect('sla_configuracoes',
       'select=*&consorcio_id=eq.'+encodeURIComponent(selectedCons)+'&order=tipo_problema.asc');
     if(!Array.isArray(rows))throw new Error('Configurações de SLA indisponíveis no banco.');
     if(t.textContent!=='Configuração de SLA'||!b.isConnected)return;
     rules=rows;
-    // Colunas seguem armazenadas em horas no Supabase V19, mas os prazos
-    // são apresentados em dias corridos (1 dia = 24 horas).
+    const padrao=rows.find(r=>r.tipo_problema==='PADRAO_GERAL');
     const mostrarDias=h=>{
-      if(h===null||h===undefined||h==='')return '—';
-      const val=Number(h);
-      return Number.isFinite(val)?(val/24).toLocaleString('pt-BR',{maximumFractionDigits:2}):'—';
+      if(h==null||h==='')return '—';
+      const n=Number(h);
+      return Number.isFinite(n)?(n/24).toLocaleString('pt-BR',{maximumFractionDigits:2}):'—';
     };
     const row=r=>'<tr>'+
-      '<td style="padding:8px">'+esc(r.tipo_problema)+'</td>'+
+      '<td style="padding:8px">'+esc(r.tipo_problema==='PADRAO_GERAL'?'Padrão geral':r.tipo_problema)+'</td>'+
       ['urb_prazo','urb_alerta','rur_prazo','rur_alerta'].map(k=>
         '<td style="padding:8px">'+esc(mostrarDias(r[k]))+'</td>').join('')+
       '</tr>';
+    const isEditable=admin()&&!!padrao;
+    const input=(id,h,label)=>'<label style="font-size:12px;font-weight:600;display:block">'+esc(label)+
+      '<input id="'+id+'" type="number" min="1" max="365" step="1" value="'+
+      esc(h==null?'':String(h/24))+'" style="margin-top:5px;width:125px;max-width:100%;padding:8px">'+
+      '</label>';
+    const edicao=isEditable?
+      '<div style="border-top:1px solid #E5E7EB;padding-top:14px;margin-top:16px">'+
+      '<strong style="font-size:13px">Alterar prazos gerais deste consórcio</strong>'+
+      '<p style="font-size:12px;color:var(--gray-500)">Afeta a regra padrão para futuros chamados. Não altera automaticamente prazos de chamados já existentes.</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:14px;margin:12px 0">'+
+      input('v19-sla-urb',padrao.urb_prazo,'Prazo urbano (dias corridos)')+
+      input('v19-sla-rur',padrao.rur_prazo,'Prazo rural (dias corridos)')+
+      '</div>'+
+      '<button class="btn btn-save" id="v19-sla-salvar" onclick="v19SalvarSLA()">💾 Salvar prazos gerais</button>'+
+      '</div>':
+      (!padrao?'<p style="font-size:12px;color:var(--amber);margin-top:14px">Regra geral ainda não cadastrada. Aplique e valide o SQL 59 exclusivamente na homologação V19.</p>':'');
     b.innerHTML='<div class="card">'+escolha(selectedCons,'v19MudarConsSLA')+
       '<p style="font-size:12px;color:var(--gray-600);margin:14px 0">'+
-      '<strong>Unidade do SLA: dias corridos.</strong> Cada dia equivale a 24 horas, incluindo finais de semana e feriados. '+
-      'Os valores existentes no Supabase são convertidos de horas para dias somente na apresentação. '+
-      'Esta tela é apenas de consulta: nenhuma regra é criada nem alterada até a homologação de uma RPC segura e dos prazos contratuais.</p>'+
+      '<strong>SLA em dias corridos (24 horas por dia).</strong> Inclui finais de semana e feriados. '+
+      'As configurações do banco são guardadas em horas, sem arredondamento de prazo.</p>'+
       '<div style="overflow:auto"><table><thead><tr><th>Tipo de problema</th>'+
-      '<th>Urbano (dias corridos)</th><th>Alerta urbano (dias)</th><th>Rural (dias corridos)</th>'+
-      '<th>Alerta rural (dias)</th></tr></thead><tbody id="v19-sla-linhas">'+
-      (rules.length?rules.map(row).join(''):'<tr><td colspan="5">Nenhuma regra cadastrada para este consórcio. Defina os prazos contratuais antes de habilitar a apuração.</td></tr>')+
-      '</tbody></table></div></div>';
-  }catch(e){b.innerHTML='<div class="card" style="color:var(--red)">'+esc(e.message)+'</div>';}
+      '<th>Urbano (dias)</th><th>Alerta urbano (dias)</th>'+
+      '<th>Rural (dias)</th><th>Alerta rural (dias)</th>'+
+      '</tr></thead><tbody id="v19-sla-linhas">'+
+      (rules.length?rules.map(row).join(''):'<tr><td colspan="5">Nenhuma regra de SLA cadastrada.</td></tr>')+
+      '</tbody></table></div>'+edicao+'</div>';
+  }catch(e){
+    b.innerHTML='<div class="card" style="color:var(--red)">'+esc(e.message)+'</div>';
+  }
 };
 
 window.v19NovoSLA=function(){
-  showToast('🔒 Edição de SLA desabilitada na V19: falta RPC de gravação homologada.','aviso');
+  showToast('🔒 Inclusão de prazos específicos ainda não homologada; use apenas a regra geral.','aviso');
 };
 window.v19SalvarSLA=async function(){
-  showToast('🔒 Nenhum prazo foi salvo. A configuração de SLA está somente para consulta.','aviso');
+  if(slaSaving)return;
+  if(!admin()||!valid(selectedCons)){
+    showToast('🔒 Sem permissão para editar a regra de SLA deste consórcio.','erro');return;
+  }
+  const padrao=rules.find(r=>r.tipo_problema==='PADRAO_GERAL');
+  if(!padrao){
+    showToast('🔒 Regra PADRAO_GERAL não existe: executar primeiro SQL 59.','erro');return;
+  }
+  const urb=Number(document.getElementById('v19-sla-urb')?.value);
+  const rur=Number(document.getElementById('v19-sla-rur')?.value);
+  if(!Number.isInteger(urb)||!Number.isInteger(rur)||urb<1||rur<1||urb>365||rur>365){
+    showToast('Informe prazos inteiros entre 1 e 365 dias corridos.','erro');return;
+  }
+  if(!window.confirm('Salvar SLA padrão deste consórcio: '+urb+
+    ' dias para urbano e '+rur+' dias para rural? Chamados existentes não serão alterados.'))return;
+  const btn=document.getElementById('v19-sla-salvar');
+  slaSaving=true;
+  if(btn){btn.disabled=true;btn.textContent='Salvando…';}
+  try{
+    const resultado=await sbFetch('rpc/v19_salvar_sla_padrao','POST',{
+      p_consorcio_id:selectedCons,p_urb_dias:urb,p_rur_dias:rur
+    });
+    if(resultado?.ok!==true || resultado.consorcio_id!==selectedCons ||
+       resultado.urb_dias!==urb || resultado.rur_dias!==rur)
+      throw new Error('RPC não confirmou os novos prazos; atualize para consultar.');
+    const b=document.getElementById('main-body');
+    const t=document.getElementById('topbar-title');
+    const a=document.getElementById('topbar-actions');
+    showToast('✅ Prazos gerais confirmados no Supabase V19.','ok');
+    await window.vSLA(b,t,a,selectedCons);
+  }catch(e){
+    console.error('[V19] salvar SLA geral:',e);
+    showToast('❌ SLA não confirmado: '+esc(e.message),'erro');
+  }finally{
+    slaSaving=false;
+    if(btn){btn.disabled=false;btn.textContent='💾 Salvar prazos gerais';}
+  }
 };
-console.info('[Aponte V19] Configuração de SLA em modo somente leitura, sem gravação direta.');
+console.info('[Aponte V19] Edição de SLA padrão somente via RPC autenticada.');
 })();
