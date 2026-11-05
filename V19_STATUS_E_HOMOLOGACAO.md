@@ -323,3 +323,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Para perfis não administradores, botão **Testar bloqueio de edição pelo banco** envia tentativa real à RPC `v19_salvar_sla_padrao`, fornecendo `p_urb_dias=0`, `p_rur_dias=0`. Essa combinação é **sempre inválida** e nunca pode produzir atualização, mesmo diante de falha de autorização. SQL 59 checa a permissão do usuário **antes** do valor dos dias, portanto resposta `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO` indica recusa pelo perfil. Resposta de validação `PRAZO_EM_DIAS_INVALIDO` revela que a verificação de permissão foi ultrapassada e demanda investigação, sem alteração de prazo.
 - A UI diferencia **APROVADO**, **inconclusivo** e **falha crítica**. Esta alteração está no GitHub, não no ZIP local; foi conferida sintaxe JavaScript, mas **não testada ainda com sessão JWT do usuário**.
 - Próximo passo único: atualizar ZIP V19, fazer login `Técnico Garantia Alfa`, entrar em SLA e clicar **Testar bloqueio de edição pelo banco**, enviar captura do resultado. Não compartilhar chave pública, JWT ou senha no chat.
+
+## SLA — teste negativo com JWT do Técnico Garantia Alfa aprovado
+
+- Operador enviou screenshot com login **Técnico Garantia Alfa**, página `SLA`, regra `PADRAO_GERAL` exibindo urbano **2 dias corridos** e rural **5 dias corridos**.
+- O novo diagnóstico `Testar bloqueio de edição pelo banco` mostra o resultado verde: **“APROVADO: o Supabase recusou a RPC para este perfil.”**
+- O código do diagnóstico envia `p_urb_dias:0`/`p_rur_dias:0`, valores sempre inválidos, e só marca APROVADO se a resposta inclui `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO`. A validação de perfil antecede a de prazo na RPC SQL59; nenhum prazo é gravável nesse teste.
+- **Aprovado para esse JWT:** bloqueio de edição por perfil Garantia pelo backend, além do bloqueio visual já observado. Não generalizar para outros perfis ou consórcios sem teste.
+- Próximo teste: **Empresa Alfa B** no mesmo ZIP atualizado, página SLA, clicar botão de diagnóstico e capturar resposta; não alterar prazos.
