@@ -1289,9 +1289,19 @@ function vChamados(b,t,a){
     if(c.status==='Concluído')return {
       txt:r.resultado?'✓ Concluído no prazo (estim.)':'✗ Concluído fora do prazo (estim.)',
       cls:r.resultado?'sla-ok':'sla-late',pct:100};
-    if(rest<0)return{txt:'✗ Atrasado '+(Math.abs(rest)/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias (estim.)',cls:'sla-late',pct:100};
-    if(rest<12)return{txt:'⚠ '+(Math.max(0,rest)/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias restantes (estim.)',cls:'sla-warn',pct};
-    return{txt:'✓ '+(rest/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias restantes (estim.)',cls:'sla-ok',pct};
+    // Arredondar APENAS a apresentação: prazo e pontualidade continuam
+    // calculados pelas horas exatas do servidor. Teto evita dizer "0 dias"
+    // quando ainda restam algumas horas; não equivale a dias completos.
+    if(rest<0){
+      const diasAtraso=Math.floor(Math.abs(rest)/24);
+      return{txt:diasAtraso===0?'✗ Em atraso (menos de 1 dia)':
+        '✗ Atrasado há '+diasAtraso+(diasAtraso===1?' dia':' dias')+' (estim.)',
+        cls:'sla-late',pct:100};
+    }
+    const diasRestantes=Math.ceil(rest/24);
+    const unidade=diasRestantes===1?' dia':' dias';
+    if(rest<12)return{txt:'⚠ Até '+diasRestantes+unidade+' restantes (estim.)',cls:'sla-warn',pct};
+    return{txt:'✓ Até '+diasRestantes+unidade+' restantes (estim.)',cls:'sla-ok',pct};
   }
 
   function fmtDT(c){
@@ -1357,7 +1367,7 @@ function vChamados(b,t,a){
         <td onclick="event.stopPropagation()" style="width:36px;padding:11px 8px">
           <input type="checkbox" ${checked} style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer" onchange="toggleSel('${c.id}',this.checked)">
         </td>
-        <td><span class="proto-link" title="${String(c.protocolo||'').replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;')}">${c.protocolo.length>22?c.protocolo.slice(0,3)+'-…-'+c.protocolo.split('-').slice(-4).join('-'):c.protocolo}</span></td>
+        <td><span class="proto-link" title="${String(c.protocolo||'').replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;')}">${c.protocolo.length>24?c.protocolo.slice(0,8)+'…'+c.protocolo.slice(-11):c.protocolo}</span></td>
         <td>${c.cidade}</td>
         <td>${c.bairro}/${c.endereco.split(',')[0]}</td>
         <td>💡 ${c.tipo}</td>
@@ -4629,8 +4639,14 @@ async function salvarChamadoInterno(){
     window._gpsLat=null;window._gpsLng=null;window._locSrc=null;
     const prazo=result.sla_horas==null?
       'SLA não configurado':(Number(result.sla_horas)/24)+' dias corridos de SLA';
+    // Após confirmação da RPC, atualizar explicitamente os chamados ANTES
+    // de mostrar a lista: evita que a primeira renderização use dados antigos
+    // e exiba "SLA não apurável" até o F5.
+    const sincronizado=await carregarChamadosDoBanco();
     showView('chamados');
     showToast('✅ Chamado '+result.protocolo+' registrado no banco; '+prazo+'.','ok');
+    if(!sincronizado)
+      showToast('⚠ O chamado foi gravado, mas a listagem não pôde ser sincronizada. Atualize a tela para conferir.','aviso');
   }catch(e){
     console.error('[V19] Falha ao criar chamado interno:',e);
     showToast('❌ Abertura não confirmada. Verifique a listagem antes de tentar novamente. '+e.message,'erro');
