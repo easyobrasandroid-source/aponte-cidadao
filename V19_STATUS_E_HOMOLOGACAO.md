@@ -505,3 +505,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Aprovado:** persistência visual do chamado, vinculação empresarial e exibição de prazo urbano após F5; não houve duplicação.
 - **Pendente:** comportamento de SLA no retorno imediato após cadastrar sem F5; no print anterior aparecia “SLA não apurável”. A cópia local pode não incorporar ainda a correção de tolerância de relógio; não declarar correção aprovada.
 - **Próximo teste:** executar SELECT de somente leitura no Supabase V19 para o chamado identificado pelo bairro, juntando `empresas`, `consorcios` e contagem do histórico; validar `sla_horas=48`, empresa correta e evento de histórico único. Não repetir cadastro.
+
+## Empresa Alfa B — abertura interna confirmada pelo SQL no Supabase (05/11/2026)
+
+- Operador enviou resultado de SELECT somente leitura do chamado criado por **Empresa Alfa B**, `V19I-5C1A01BA3344447EA4E21D26A85E8630`: `Urbana`, `Recebido`, `sla_horas=48` (`prazo_dias=2`), `empresa_responsavel=TESTE V19 - Empresa Alfa B`, `created_at=2026-11-05 18:48:20.647697+00`, `eventos_historico=1`.
+- **APROVADO no banco:** a RPC SQL62 aceita a criação para a própria empresa autorizada, atribui a Empresa Alfa B, o gatilho SQL61 fixa o SLA de 2 dias corridos e o registro de histórico inicial é único. UI já comprovou seis chamados visíveis após F5 e não duplicação.
+- **PENDENTE:** teste negativo do JWT da Empresa Alfa B tentando cadastrar em nome de outra empresa ou consórcio (não concluir só pela UI); confirmar a correção de SLA no primeiro carregamento, sem F5, em novo ZIP. Portal público permanece pendente e produção V18 não foi modificada.
+- **Próxima etapa proposta:** homologar limites de permissão da criação interna SQL62 por conta empresarial; qualquer teste negativo precisa garantir que não ocorrerá gravação mesmo diante de uma falha de autorização, evitando chamados duplicados.
