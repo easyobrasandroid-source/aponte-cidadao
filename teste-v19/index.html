@@ -2635,7 +2635,8 @@ function gerarExcel(tipo){
           'Tipo':c.tipo,'Qtd Lâmpadas':c.qtd,'Status':c.status,
           'Empresa':c.empresa,'Prioridade':c.prioridade,
           'Origem':c.origem,'Solicitante':c.solicitante,'Telefone':c.tel,
-          'SLA (h)':c.sla,'SLA %':c.slaPct+'%',
+          'Prazo SLA (dias corridos)':c._slaHoras==null?'Não informado':Number((c._slaHoras/24).toFixed(2)),
+          'Situação SLA':window.v19StatusSLA?.(c).estado||'Não apurável',
           'Área':c.area,'GPS Lat':c.lat||'','GPS Lng':c.lng||'',
           'Origem localização':c.loc_src||''
         }));
