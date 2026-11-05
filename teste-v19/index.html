@@ -1270,6 +1270,36 @@ async function carregarChamadosDoBanco(){
     return true;
   }catch(e){ console.warn('[Supabase] sincronizar:', e.message); return false; }
 }
+// Diagnóstico V19: teste NEGATIVO da RPC com JWT real do perfil Garantia.
+// p_cidade_id=NULL não pode criar nenhum chamado, mesmo se houver
+// regressão na verificação de perfil: o servidor exige cidade válida.
+let v19TesteCriacaoGarantiaOcupado=false;
+async function v19TestarBloqueioCriacaoGarantia(){
+  if(CU?.perfil!=='garantia'||v19TesteCriacaoGarantiaOcupado)return;
+  const b=document.getElementById('v19-testar-bloqueio-criacao');
+  if(!b)return;
+  v19TesteCriacaoGarantiaOcupado=true;b.disabled=true;
+  const antigo=b.textContent;
+  b.textContent='Verificando no Supabase…';
+  try{
+    await sbFetch('rpc/v19_criar_chamado_interno','POST',{
+      p_cidade_id:null,p_tipo:'TESTE DE BLOQUEIO V19',p_area:'Urbana'
+    });
+    showToast('❌ FALHA CRÍTICA: chamada inválida aceita. Suspender homologação.','erro');
+  }catch(e){
+    const msg=String(e.corpo||'')+' '+String(e.message||'');
+    if(/PERFIL_NAO_AUTORIZADO/.test(msg)){
+      showToast('✅ APROVADO: Supabase bloqueou abertura para Técnico de Garantia.','ok');
+    }else{
+      console.warn('[V19] Teste negativo de abertura inconclusivo:',e);
+      showToast('⚠ Teste inconclusivo: erro diferente de PERFIL_NAO_AUTORIZADO.','erro');
+    }
+  }finally{
+    v19TesteCriacaoGarantiaOcupado=false;
+    b.disabled=false;
+    b.textContent=antigo;
+  }
+}
 function vChamados(b,t,a){
   // Sincronizar com o banco ao abrir a tela — atualiza só a tabela quando os dados chegam
   carregarChamadosDoBanco().then(ok=>{
@@ -1278,7 +1308,7 @@ function vChamados(b,t,a){
   t.textContent= CU?.perfil==='garantia' ? '⚡ Chamados em Garantia LED' : 'Chamados';
   // Perfil garantia não cria chamados — só executa
   a.innerHTML= CU?.perfil==='garantia'
-    ? `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button>`
+    ? `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><button class="btn btn-ghost" id="v19-testar-bloqueio-criacao" onclick="v19TestarBloqueioCriacaoGarantia()">🔒 Testar bloqueio de criação</button>`
     : `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><button class="btn btn-save" onclick="vNovoChamado()">+ Novo chamado</button>`;
   let SEL=new Set();
   // Aplicar filtros vindos do dashboard
