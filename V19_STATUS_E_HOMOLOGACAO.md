@@ -526,3 +526,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Lista da conta permanece com **4 chamados de garantia** e o botão `+ Novo chamado` não aparece. **Aprovado no backend e na interface para este JWT**.
 - Não confundir com teste de todas as identidades/perfis: falta testar a autorização de atribuir outra empresa e de abrir em consórcio diferente, além da atualização imediata do SLA sem F5 em novo ZIP.
 - Próxima etapa recomendada: **Master V19** abre formulário de Novo chamado para conferir escopo de cidades e empresas (sem registrar chamado ainda); avaliar em seguida testes negativos cruzados protegidos por dados inválidos e sem persistência.
+
+## Master V19 — seletor de municípios Alfa e Beta confirmado (05/11/2026)
+
+- Print do operador autenticado como **Administrador Master** na tela `Novo chamado interno`; seletor de cidade aberto inclui exatamente `Municipio Alfa 1`, `Municipio Alfa 2` e `Municipio Beta 1`.
+- **Aprovado:** o Master consegue selecionar cidades dos consórcios Alfa e Beta na interface. Campo `Organização` exibe `—`, pendência visual já identificada.
+- **Ainda não aprovado:** atribuição de empresa por cidade na interface. Pelo código atual `teste-v19/index.html`, o seletor de empresas do Master é filtrado só por perfil (`master` vê todas), sem restringir à cidade atualmente escolhida; a RPC SQL62 verifica empresa ativa do mesmo consórcio e vínculo `empresa_cidades` e deve rejeitar atribuições incompatíveis. Essa é uma diferença de UX potencial entre frontend e servidor.
+- **Próximo passo único do operador:** no formulário Master já aberto, selecionar `Municipio Beta 1`, abrir o dropdown `Empresa responsável` e enviar print sem registrar chamado, para identificar opções inadequadas antes de corrigir filtro de frontend.
