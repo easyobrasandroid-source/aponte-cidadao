@@ -203,3 +203,12 @@ Evidência: capturas de tela apresentadas pelo operador, no banco de homologaç�
 - Segundo chamado `V19-TESTE-UI-GARANTIA-ALFA-B-57`, Empresa Alfa B, permaneceu em `Aguardando Garantia LED` e será usado para validar conclusão pela **empresa responsável**, sem repetir o primeiro teste.
 - Os prints comprovam estado e histórico, mas não explicitam novo F5 após a conclusão; registrar persistência após recarregar no próximo cenário.
 - Corrigida abreviação de protocolos longos na listagem (commit `a729e320633959429a326cc0ecec0998a51d9781`): agora diferencia `V19-…-GARANTIA-ALFA-A-57` e `V19-…-GARANTIA-ALFA-B-57`, título HTML com número completo. **Correção disponível somente no próximo ZIP**, ainda não validada no navegador.
+
+## Garantia LED — conclusão pela empresa responsável na interface (05/11/2026)
+
+- Evidência: dois prints do login **Empresa Alfa B** na interface V19 de homologação; protocolo completo `V19-TESTE-UI-GARANTIA-ALFA-B-57`.
+- Aba Resumo: status final **Concluído**, conclusão em **05/11/2026 08:07:03**, empresa atribuída `TESTE V19 - Empresa Alfa B`, cidade `Municipio Alfa 1`, botão Concluir indisponível.
+- Aba Histórico: **1 evento**, transição `Aguardando Garantia LED → Concluído`, responsável `Empresa Alfa B`, timestamp **05/11/2026 08:07:03**.
+- Assim foram aprovados os dois cenários positivos de conclusão de Garantia LED pela interface: **Técnico Garantia Alfa** sobre chamado Alfa A e **empresa responsável Alfa B** sobre chamado Alfa B, com identificação e histórico correto.
+- Não há evidência inequívoca de F5 após esse último teste; validar persistência em recarregamento explicitamente.
+- Pendências antes da homologação ampla: tentativas negativas de operação por empresa não responsável/consórcio cruzado, prevenção de segunda conclusão pela interface/API atual, SLA marcado `Não apurável (estimativa)`, e validação visual da abreviação de protocolo corrigida no GitHub mas ainda não implantada na cópia local.
