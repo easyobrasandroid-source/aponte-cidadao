@@ -1205,6 +1205,33 @@ function vDashboard(b,t,a,semConsulta=false){
     +'</div>';
 }
 
+// ═══ SLA V19 — regra única baseada nos dados de SLA da linha do banco ═══
+// Deve existir antes de a lista renderizar, independentemente do carregamento
+// de arquivos auxiliares de exportação. 1 dia corrido = 24 horas.
+function v19StatusSLALinha(c){
+  const raw = c?._slaHoras ?? c?.sla_horas ?? null;
+  const prazo = raw==null || raw==='' ? NaN : Number(raw);
+  if(!Number.isFinite(prazo) || prazo<=0 || !c?.created_at)
+    return {estado:'Não apurável',resultado:null,tempo:null,prazo:null};
+  if(c.sla_pausado)
+    return {estado:'Pausado (sem histórico de pausa)',resultado:null,tempo:null,prazo};
+  if(c.status==='Concluído'&&!c.completed_at)
+    return {estado:'Concluído sem data (não apurável)',resultado:null,tempo:null,prazo};
+  const abertura=new Date(c.created_at).getTime();
+  const encerramento=c.completed_at?
+    new Date(c.completed_at).getTime():Date.now();
+  if(!Number.isFinite(abertura)||!Number.isFinite(encerramento)||
+     encerramento<abertura)
+    return {estado:'Data inválida',resultado:null,tempo:null,prazo};
+  const tempo=(encerramento-abertura)/36e5;
+  const concluido=c.status==='Concluído';
+  const dentro=tempo<=prazo;
+  return {estado:concluido?(dentro?'Concluído no prazo':'Concluído fora do prazo'):
+    (dentro?'Em andamento no prazo':'Em atraso'),
+    resultado:concluido?dentro:null,tempo,prazo,vencido:!dentro};
+}
+window.v19StatusSLA=v19StatusSLALinha;
+
 // ═══ CHAMADOS ═══
 async function carregarChamadosDoBanco(){
   try{
