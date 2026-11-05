@@ -644,7 +644,7 @@ async function sbRefreshSession(){
 const V19_WRITABLE_RPCS = new Set([
  'v19_assumir_chamado','v19_atualizar_status_chamado',
  'v19_concluir_garantia','v19_listar_disponiveis',
-  'v19_salvar_sla_padrao',
+  'v19_salvar_sla_padrao','v19_criar_chamado_interno',
  'v19_salvar_material','v19_movimentar_estoque',
  'consumir_material_chamado','editar_material_chamado','remover_material_chamado'
 ]);
@@ -1246,7 +1246,7 @@ function vChamados(b,t,a){
   // Perfil garantia não cria chamados — só executa
   a.innerHTML= CU?.perfil==='garantia'
     ? `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button>`
-    : `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><span class="btn btn-ghost" style="opacity:.6;cursor:not-allowed" title="Criação de chamado aguarda RPC V19">+ Novo chamado (em integração)</span>`;
+    : `<button class="btn btn-ghost" onclick="showView('impressao')">🖨 Imprimir</button><button class="btn btn-save" onclick="vNovoChamado()">+ Novo chamado</button>`;
   let SEL=new Set();
   // Aplicar filtros vindos do dashboard
   const navSt=NAV_FILTERS.status||'';
@@ -4279,7 +4279,7 @@ async function vNovoChamado(){
   const disponiveis=cidades.filter(c=>CU.perfil==='master'||
     (CU.perfil==='prefeitura'?c.id===CU.cidade_id:c.consorcio_id===CU.consorcio_id));
   if(!disponiveis.length){showToast('Nenhuma cidade autorizada para seu perfil.','erro');return;}
-  const cityOptions=disponiveis.map(c=>`<option value="${escaparCidadeHTML(c.nome)}">${escaparCidadeHTML(c.nome)}</option>`).join('');
+  const cityOptions=disponiveis.map(c=>`<option value="${escaparCidadeHTML(c.id)}">${escaparCidadeHTML(c.nome)}</option>`).join('');
   const empresas=CU.perfil==='prefeitura'?[]:(await sbSelect('empresas','select=id,nome,consorcio_id&order=nome.asc')||[]);
   const empresasVisiveis=empresas.filter(e=>(CU.perfil==='master'||e.consorcio_id===CU.consorcio_id)&&(CU.perfil!=='empresa'||e.id===CU.empresa_id));
   const empresaInput=CU.perfil==='prefeitura'
@@ -4435,7 +4435,8 @@ async function autocompleteEndereco(query, suggestionsId, cidadeFieldId){
   sug.innerHTML='<div style="padding:8px 12px;font-size:11px;color:var(--gray-400)">🔍 Buscando endereços...</div>';
   sug.style.display='block';
   _autocompleteTimer=setTimeout(async()=>{
-    const cidade=document.getElementById(cidadeFieldId)?.value||'Espera Feliz';
+    const cField=document.getElementById(cidadeFieldId);
+    const cidade=cField?.tagName==='SELECT'?(cField.selectedOptions[0]?.textContent||'Espera Feliz'):(cField?.value||'Espera Feliz');
     console.log('[Autocomplete] Query:', query, '| Cidade:', cidade, '| suggestionsId:', suggestionsId);
     let results=null;
     // Tentativa 1: Google Geocoding (CORS aberto, chave já ativa)
@@ -4538,54 +4539,71 @@ function confirmarPontoMinimap(){
 }
 
 async function salvarChamadoInterno(){
+  if(!CU||!['master','consorcio','prefeitura','empresa'].includes(CU.perfil)){
+    showToast('Seu perfil não pode abrir chamados internos.','erro');return;
+  }
   const botao=document.querySelector('button[onclick="salvarChamadoInterno()"]');
-  if(botao?.disabled) return;
-  const cidadeEl=document.getElementById('int-cidade');
-  const nomeCidade=cidadeEl?.value||'';
-  const city=(DB.cidades||[]).find(c=>c.nome===nomeCidade&&(
-    CU?.perfil==='master'||(CU?.perfil==='prefeitura'?c.id===CU.cidade_id:c.consorcio_id===CU?.consorcio_id)));
-  if(!city){showToast('Cidade não autorizada para o seu perfil.','erro');return;}
+  if(botao?.disabled)return;
+  const cityId=document.getElementById('int-cidade')?.value||'';
+  const city=(DB.cidades||[]).find(c=>c.id===cityId&&(
+    CU.perfil==='master'||(CU.perfil==='prefeitura'?
+      c.id===CU.cidade_id:c.consorcio_id===CU.consorcio_id)));
+  if(!city){showToast('Cidade não autorizada para seu perfil.','erro');return;}
   const bairro=document.getElementById('int-bairro')?.value?.trim()||'';
   const endereco=document.getElementById('int-end')?.value?.trim()||'';
   const area=document.getElementById('int-area')?.value||'Urbana';
-  const qtd=Math.max(1,parseInt(document.getElementById('int-qtd')?.value,10)||1);
+  const quantidade=document.getElementById('int-qtd')?.value;
+  const qtd=quantidade==='Mais de 5'?6:Number(quantidade);
   const obs=document.getElementById('int-obs')?.value?.trim()||'';
-  const empresaId=CU?.perfil==='prefeitura'?null:(CU?.perfil==='empresa'?CU.empresa_id:(document.getElementById('int-emp')?.value||null));
-  // O banco nunca recebe um código sequencial inferido pela quantidade do cache.
-  // Identificador aleatório: índice UNIQUE no Postgres impede colisões.
-  const now=new Date(),proto=gerarProto();
+  const empresaId=CU.perfil==='prefeitura'?null:CU.perfil==='empresa'?
+    CU.empresa_id:(document.getElementById('int-emp')?.value||null);
+  if(!['Urbana','Rural'].includes(area)||!Number.isInteger(qtd)||qtd<1||qtd>999){
+    showToast('Área ou quantidade inválida.','erro');return;
+  }
   let lat=null,lng=null,loc_src='manual';
-  if(window._locSrc==='minimap_confirmed'&&Number.isFinite(window._gpsLat)&&Number.isFinite(window._gpsLng)){
+  if(window._locSrc==='minimap_confirmed'&&
+     Number.isFinite(window._gpsLat)&&Number.isFinite(window._gpsLng)){
     lat=window._gpsLat;lng=window._gpsLng;loc_src='minimap_confirmed';
   }else if(Number.isFinite(window._gpsLat)&&Number.isFinite(window._gpsLng)){
     lat=window._gpsLat;lng=window._gpsLng;loc_src='gps_mobile';
   }
-  // Não fabricar coordenadas próximas do centro da cidade quando o endereço não foi localizado.
+  // Sem coordenada fictícia por centro da cidade.
   if(lat===null&&endereco){
     try{
-      const pedacos=endereco.split(',');
-      const geo=await tentarGeocodar({rua:pedacos[0],numero:pedacos[1]?.trim()||'',bairro,cidade:city.nome},'geocode-status-int');
-      if(geo&&Number.isFinite(geo.lat)&&Number.isFinite(geo.lng)&&geo.confianca!=='cidade_aproximada'){
+      const partes=endereco.split(',');
+      const geo=await tentarGeocodar({
+        rua:partes[0],numero:partes[1]?.trim()||'',bairro,cidade:city.nome
+      },'geocode-status-int');
+      if(geo&&Number.isFinite(geo.lat)&&Number.isFinite(geo.lng)&&
+         geo.confianca!=='cidade_aproximada'){
         lat=geo.lat;lng=geo.lng;loc_src='address_geocoding';
       }
-    }catch(e){console.warn('[GPS] Geocodificação não disponível:',e.message);}
+    }catch(e){console.warn('[V19] geocodificação:',e.message);}
   }
-  const chamado={
-    id:proto,protocolo:proto,cidade:city.nome,cidade_id:city.id,consorcio_id:city.consorcio_id,
-    bairro,endereco,area,tipo:intProb,qtd,obs,empresa_id:empresaId,status:'Recebido',
-    prioridade:'Média',origem:'Interno',solicitante:CU?.nome||'',
-    lat,lng,loc_src,created_at:now.toISOString(),sla:null
-  };
-  if(botao){botao.disabled=true;botao.textContent='Registrando no banco…';}
+  if(botao){botao.disabled=true;botao.textContent='Registrando no Supabase…';}
   try{
-    const ok=await sbSaveChamado(chamado);
-    if(!ok){showToast('❌ O Supabase não confirmou o chamado. Nada foi incluído na lista.','erro');return;}
+    // Todos os campos administrativos (consórcio, protocolo, status,
+    // abertura, SLA e autor do histórico) vêm exclusivamente do banco.
+    const result=await sbFetch('rpc/v19_criar_chamado_interno','POST',{
+      p_cidade_id:city.id,
+      p_tipo:intProb,p_area:area,
+      p_bairro:bairro||null,p_endereco:endereco||null,
+      p_qtd:qtd,p_observacoes:obs||null,
+      p_empresa_id:empresaId,p_latitude:lat,p_longitude:lng,p_loc_src:loc_src
+    });
+    if(!result||result.ok!==true||!result.id||!result.protocolo||
+       result.cidade_id!==city.id||result.area!==area||
+       result.status!=='Recebido'){
+      throw new Error('O servidor não confirmou todos os dados da abertura.');
+    }
     window._gpsLat=null;window._gpsLng=null;window._locSrc=null;
-    DB.historico[chamado.id]=[{s:'Recebido',m:now.toLocaleString('pt-BR')+' — '+(CU?.nome||'Sistema'),c:'#1251A3'}];
-    // O histórico é acessório; falha dele não desfaz um chamado confirmado no servidor.
-    await sbSaveHistorico(chamado.protocolo,DB.historico[chamado.id]);
+    const prazo=result.sla_horas==null?
+      'SLA não configurado':(Number(result.sla_horas)/24)+' dias corridos de SLA';
     showView('chamados');
-    showToast('✅ Chamado '+chamado.protocolo+' confirmado no banco.','ok');
+    showToast('✅ Chamado '+result.protocolo+' registrado no banco; '+prazo+'.','ok');
+  }catch(e){
+    console.error('[V19] Falha ao criar chamado interno:',e);
+    showToast('❌ Abertura não confirmada. Verifique a listagem antes de tentar novamente. '+e.message,'erro');
   }finally{
     if(botao){botao.disabled=false;botao.textContent='✅ Registrar chamado →';}
   }
