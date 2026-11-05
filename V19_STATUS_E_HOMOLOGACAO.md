@@ -195,3 +195,11 @@ Evidência: capturas de tela apresentadas pelo operador, no banco de homologaç�
 - SQL 57 prepara **dois novos chamados fictícios pendentes** (um Alfa A e um Alfa B), guardados por consórcio, RPCs, contas vinculadas e cidade habilitada. A transação falha se a fixture já existir, para impedir repetição; não toca dados antigos, produção ou políticas.
 - Próximo passo: operador executa **uma única vez** SQL 57 no **projeto Supabase V19 de homologação**, compartilha apenas a tabela final (esperado 2 linhas `Aguardando Garantia LED`, `conclusao_pendente=true` e 0 históricos) — jamais compartilhe chaves/senhas.
 - Só então atualizar F5 no login Garantia Alfa e testar a primeira conclusão na interface. Depois testar segunda com empresa atribuída, validando histórico/persistência e isolamento. V18 não tocada.
+
+## Garantia LED — conclusão pela interface do Técnico Garantia Alfa validada (05/11/2026)
+
+- Chamado SQL 57 `V19-TESTE-UI-GARANTIA-ALFA-A-57`, Empresa Alfa A, foi concluído pelo perfil **Técnico Garantia Alfa** usando a interface local V19; print do Resumo mostra `Concluído`, conclusão em **05/11/2026 08:03:47**, empresa preservada, e ação de conclusão indisponível.
+- Print da aba Histórico mostra **1 evento**, transição `Aguardando Garantia LED → Concluído`, autor **Técnico Garantia Alfa**, mesma data/hora.
+- Segundo chamado `V19-TESTE-UI-GARANTIA-ALFA-B-57`, Empresa Alfa B, permaneceu em `Aguardando Garantia LED` e será usado para validar conclusão pela **empresa responsável**, sem repetir o primeiro teste.
+- Os prints comprovam estado e histórico, mas não explicitam novo F5 após a conclusão; registrar persistência após recarregar no próximo cenário.
+- Corrigida abreviação de protocolos longos na listagem (commit `a729e320633959429a326cc0ecec0998a51d9781`): agora diferencia `V19-…-GARANTIA-ALFA-A-57` e `V19-…-GARANTIA-ALFA-B-57`, título HTML com número completo. **Correção disponível somente no próximo ZIP**, ainda não validada no navegador.
