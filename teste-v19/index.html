@@ -1329,7 +1329,7 @@ function vChamados(b,t,a){
         <td onclick="event.stopPropagation()" style="width:36px;padding:11px 8px">
           <input type="checkbox" ${checked} style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer" onchange="toggleSel('${c.id}',this.checked)">
         </td>
-        <td><span class="proto-link">${c.protocolo.slice(0,3)}…${c.protocolo.slice(-3)}</span></td>
+        <td><span class="proto-link" title="${String(c.protocolo||'').replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;')}">${c.protocolo.length>22?c.protocolo.slice(0,3)+'-…-'+c.protocolo.split('-').slice(-4).join('-'):c.protocolo}</span></td>
         <td>${c.cidade}</td>
         <td>${c.bairro}/${c.endereco.split(',')[0]}</td>
         <td>💡 ${c.tipo}</td>
