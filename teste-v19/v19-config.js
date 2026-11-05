@@ -113,26 +113,28 @@ window.vSLA=async function(b,t,a,consId){
     if(!Array.isArray(rows))throw new Error('Configurações de SLA indisponíveis no banco.');
     if(t.textContent!=='Configuração de SLA'||!b.isConnected)return;
     rules=rows;
-    const canEdit=false; // Somente leitura: não existe RPC de SLA homologada para gravação.
-    const row=(r,i)=>'<tr>'+
-      '<td style="padding:8px"><input data-sla-campo="tipo" data-idx="'+i+'" value="'+esc(r.tipo_problema)+'" '+
-        (canEdit?'':'disabled')+' style="min-width:160px"></td>'+
+    // Colunas seguem armazenadas em horas no Supabase V19, mas os prazos
+    // são apresentados em dias corridos (1 dia = 24 horas).
+    const mostrarDias=h=>{
+      if(h===null||h===undefined||h==='')return '—';
+      const val=Number(h);
+      return Number.isFinite(val)?(val/24).toLocaleString('pt-BR',{maximumFractionDigits:2}):'—';
+    };
+    const row=r=>'<tr>'+
+      '<td style="padding:8px">'+esc(r.tipo_problema)+'</td>'+
       ['urb_prazo','urb_alerta','rur_prazo','rur_alerta'].map(k=>
-        '<td style="padding:8px"><input type="number" min="1" max="8760" data-sla-campo="'+k+
-        '" data-idx="'+i+'" value="'+esc(r[k])+'" style="width:85px" '+(canEdit?'':'disabled')+'></td>').join('')+
+        '<td style="padding:8px">'+esc(mostrarDias(r[k]))+'</td>').join('')+
       '</tr>';
     b.innerHTML='<div class="card">'+escolha(selectedCons,'v19MudarConsSLA')+
-      '<p style="font-size:11px;color:var(--gray-500);margin:14px 0">Prazos e alertas expressos em horas. '+
-      'Regras consultadas no Supabase por consórcio. Edição bloqueada até existir RPC segura de gravação e homologação contratual.</p>'+
+      '<p style="font-size:12px;color:var(--gray-600);margin:14px 0">'+
+      '<strong>Unidade do SLA: dias corridos.</strong> Cada dia equivale a 24 horas, incluindo finais de semana e feriados. '+
+      'Os valores existentes no Supabase são convertidos de horas para dias somente na apresentação. '+
+      'Esta tela é apenas de consulta: nenhuma regra é criada nem alterada até a homologação de uma RPC segura e dos prazos contratuais.</p>'+
       '<div style="overflow:auto"><table><thead><tr><th>Tipo de problema</th>'+
-      '<th>Urbano (h)</th><th>Alerta urbano (h)</th><th>Rural (h)</th>'+
-      '<th>Alerta rural (h)</th></tr></thead><tbody id="v19-sla-linhas">'+
-      (rules.length?rules.map(row).join(''):'<tr><td colspan="5">Nenhuma regra cadastrada para este consórcio.</td></tr>')+
-      '</tbody></table></div>'+
-      (canEdit?'<div style="display:flex;gap:10px;margin-top:14px">'+
-      '<button class="btn btn-ghost" onclick="v19NovoSLA()">+ Novo prazo</button>'+
-      '<button class="btn btn-save" id="v19-sla-salvar" onclick="v19SalvarSLA()">💾 Salvar prazos</button></div>':'')+
-      '</div>';
+      '<th>Urbano (dias corridos)</th><th>Alerta urbano (dias)</th><th>Rural (dias corridos)</th>'+
+      '<th>Alerta rural (dias)</th></tr></thead><tbody id="v19-sla-linhas">'+
+      (rules.length?rules.map(row).join(''):'<tr><td colspan="5">Nenhuma regra cadastrada para este consórcio. Defina os prazos contratuais antes de habilitar a apuração.</td></tr>')+
+      '</tbody></table></div></div>';
   }catch(e){b.innerHTML='<div class="card" style="color:var(--red)">'+esc(e.message)+'</div>';}
 };
 
