@@ -431,3 +431,9 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Pendente de implementação após testes atuais**, para não obrigar novo ZIP durante a homologação do chamado rural.
 - Manter armazenamento, vencimento e verificação do SLA com precisão de timestamp/horas no banco. Ajustar apenas apresentação e esclarecer limiares de arredondamento, especialmente prazo inferior a 24h e transição para atraso, para não transmitir prazo enganoso. Conferir listagem, detalhes e relatórios.
 - O próximo teste em andamento continua sendo o chamado **Rural Alfa**, esperado SLA `120 horas` = `5 dias corridos`, com registro único de histórico.
+
+## SLA rural — novo chamado criado, prazo na UI ainda não apurável (05/11/2026)
+
+- Print do Gestor Consórcio Alfa após registrar o segundo chamado sintético interno: tabela exibe **10 chamados**, primeiro registro recente `Municipio Alfa 1`, bairro `Homologação V19 Rural`, tipo `Lâmpada piscando`, status `Recebido`, origem `Interno`, abertura 05/11/2026 13:53 (BRT).
+- **Criação e leitura do novo registro aprovadas visualmente**. A coluna SLA do novo rural exibe `SLA não apurável` embora a configuração Alfa tenha `rur_prazo=120` (5 dias corridos). O chamado urbano anterior permanece com `1,99 dias restantes`.
+- **Não aprovar ainda SLA rural**. Distinguir hipótese de erro de atribuição no banco vs erro de exibição na interface com SELECT de somente leitura por `consorcio.slug='teste-v19-alfa'`, `origem='Interno'`, `area='Rural'`, retornando `sla_horas`, prazo dias, data de abertura, pausa, histórico. Não criar outro chamado nem reexecutar migrations.
