@@ -1220,10 +1220,16 @@ function v19StatusSLALinha(c){
   const abertura=new Date(c.created_at).getTime();
   const encerramento=c.completed_at?
     new Date(c.completed_at).getTime():Date.now();
-  if(!Number.isFinite(abertura)||!Number.isFinite(encerramento)||
-     encerramento<abertura)
+  if(!Number.isFinite(abertura)||!Number.isFinite(encerramento))
     return {estado:'Data inválida',resultado:null,tempo:null,prazo};
-  const tempo=(encerramento-abertura)/36e5;
+  // Na abertura, o relógio do navegador pode estar alguns segundos atrás
+  // do Supabase. Evitar SLA "não apurável" transitório se a diferença
+  // for pequena. Não modificar created_at ou prazo registrado no banco.
+  const diferencaMs=encerramento-abertura;
+  const toleranciaMs=5*60*1000;
+  if(diferencaMs<0&&(c.completed_at||Math.abs(diferencaMs)>toleranciaMs))
+    return {estado:'Relógio divergente',resultado:null,tempo:null,prazo};
+  const tempo=Math.max(0,diferencaMs)/36e5;
   const concluido=c.status==='Concluído';
   const dentro=tempo<=prazo;
   return {estado:concluido?(dentro?'Concluído no prazo':'Concluído fora do prazo'):
