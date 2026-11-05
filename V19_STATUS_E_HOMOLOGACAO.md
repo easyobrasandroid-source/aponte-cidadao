@@ -339,3 +339,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Este diagnóstico envia `p_urb_dias=0` e `p_rur_dias=0` para a `v19_salvar_sla_padrao`; a UI somente considera aprovado quando o erro da RPC é `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO`. O SQL 59 verifica o perfil antes de validar os valores, e 0 não poderia ser salvo.
 - **Aprovada negativa por JWT Empresa Alfa B**; somada à negativa por JWT Técnico Garantia Alfa, e aos testes positivos de Master e Gestor Consórcio Alfa com persistência.
 - O isolamento de gestor de outro consórcio e a atribuição automática da regra `PADRAO_GERAL` a novos chamados seguem **pendentes**. O teste não comprova todos os papéis ou todos os consórcios.
+
+## SLA — Master consultou Consórcio Beta sem herdar regra do Alfa (05/11/2026)
+
+- Captura de tela: usuário autenticado **Administrador Master** na opção SLA, consórcio selecionado **TESTE V19 - Consórcio Beta**; a tabela informa **"Nenhuma regra de SLA cadastrada"** e não apresenta 2/5 dias do Alfa.
+- **Aprovado:** segregação de leitura de configuração entre os consórcios na interface Master. Não equivale a teste de gestor Alfa tentando editar Beta via RPC com seu JWT.
+- Encontrado erro de UX: aviso sugeria executar novamente SQL59 apesar de ele só criar a regra de Alfa e falhar se reexecutado. Corrigido `teste-v19/v19-config.js` na branch desenvolvimento-v19 (commit `f7225ad7df06e95fa1d5c3daf91ffa5b6fa69ffe`) para avisar que Beta não tem regra própria e não orientar repetição do SQL59. **Mudança ainda não presente na cópia ZIP local do usuário.**
+- Próximo passo visual único: entrar como **Gestor Consórcio Alfa**, abrir menu SLA, expandir seletor de consórcios e observar se oferece apenas o Alfa; não alterar valores. O isolamento de escrita por JWT de consórcio não será considerado provado apenas com esse teste de interface.
