@@ -285,3 +285,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Operador posteriormente informou que os valores **permaneceram após F5**, confirmando persistência pela interface. Não houve print posterior ao F5 neste turno; evidência é o relato do operador.
 - **Aprovado: gravação autorizada e persistência** para o perfil Consórcio Alfa. Permanecem por verificar: perfil Master, bloqueio de outros perfis por JWT e isolamento de consórcios sem autorização. A regra ainda não é automaticamente aplicada aos chamados criados.
 - Próximo teste de interface (somente leitura): login no perfil **Master**, acessar o menu SLA e observar se pode selecionar Consórcio Alfa e se a tabela apresenta os valores 2/5 dias, sem salvar nem modificar nada.
+
+## SLA — teste de gravação pelo perfil Master (05/11/2026)
+
+- Usuário enviou captura da tela de **Administrador Master**, consórcio `TESTE V19 - Consórcio Alfa`, regra geral `2 dias urbanos / 5 dias rurais` e campos de edição habilitados.
+- Ao ser solicitado a clicar em `Salvar prazos gerais` mantendo 2 e 5, o usuário respondeu **"sim"** à pergunta sobre a mensagem de sucesso. **Gravação pelo Master confirmada pelo relato do operador**.
+- A captura posterior mostra 2/5 na tela, mas não permite comprovar sozinha novo F5; **persistência do Master após recarregamento ainda aguarda confirmação**.
+- Não houve alteração de prazos, como previsto no roteiro. Não interpretar esse teste como prova de isolamento negativo dos demais perfis.
+- Próxima ação: F5 no Master, abrir SLA e confirmar que 2/5 persistem; em seguida testar bloqueio para perfil sem direito de edição.
