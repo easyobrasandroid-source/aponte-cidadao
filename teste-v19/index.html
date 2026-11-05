@@ -4343,6 +4343,36 @@ function vConfigPortal(b,t,a){
 
 // ═══ NOVO CHAMADO INTERNO ═══
 function escaparCidadeHTML(valor){return String(valor??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+// Vínculos temporários do formulário lidos pelo JWT; servidor valida novamente.
+let v19EmpresasAbertura=null;
+function v19EmpresasPermitidasNaCidade(cidadeId){
+  if(!v19EmpresasAbertura||!CU)return [];
+  const city=v19EmpresasAbertura.cidades.find(c=>c.id===cidadeId);
+  if(!city)return [];
+  return v19EmpresasAbertura.empresas.filter(e=>
+    e.status==='ativo'&&e.consorcio_id===city.consorcio_id&&
+    (CU.perfil==='master'||e.consorcio_id===CU.consorcio_id)&&
+    (CU.perfil!=='empresa'||e.id===CU.empresa_id)&&
+    v19EmpresasAbertura.vinculos.some(v=>v.empresa_id===e.id&&v.cidade_id===city.id));
+}
+function v19AtualizarEmpresasAbertura(){
+  const sel=document.getElementById('int-emp');
+  if(!sel||!CU)return;
+  const cityId=document.getElementById('int-cidade')?.value||'';
+  const permitidas=v19EmpresasPermitidasNaCidade(cityId);
+  if(CU.perfil==='empresa'){
+    const propria=permitidas.find(e=>e.id===CU.empresa_id);
+    sel.innerHTML=propria?
+      '<option value="'+escaparCidadeHTML(propria.id)+'">'+escaparCidadeHTML(propria.nome)+'</option>':
+      '<option value="">Empresa não atende este município</option>';
+    sel.disabled=true;
+  }else{
+    sel.innerHTML='<option value="">Sem atribuição</option>'+
+      permitidas.map(e=>'<option value="'+escaparCidadeHTML(e.id)+'">'+
+        escaparCidadeHTML(e.nome)+'</option>').join('');
+    sel.disabled=false;
+  }
+}
 async function vNovoChamado(){
   if(!CU||!['master','consorcio','prefeitura','empresa'].includes(CU.perfil)){
     showToast('Perfil sem permissão para abrir chamados.','erro'); return;
@@ -4354,11 +4384,30 @@ async function vNovoChamado(){
     (CU.perfil==='prefeitura'?c.id===CU.cidade_id:c.consorcio_id===CU.consorcio_id));
   if(!disponiveis.length){showToast('Nenhuma cidade autorizada para seu perfil.','erro');return;}
   const cityOptions=disponiveis.map(c=>`<option value="${escaparCidadeHTML(c.id)}">${escaparCidadeHTML(c.nome)}</option>`).join('');
-  const empresas=CU.perfil==='prefeitura'?[]:(await sbSelect('empresas','select=id,nome,consorcio_id&order=nome.asc')||[]);
-  const empresasVisiveis=empresas.filter(e=>(CU.perfil==='master'||e.consorcio_id===CU.consorcio_id)&&(CU.perfil!=='empresa'||e.id===CU.empresa_id));
+  // Carregar vínculos reais de cidade/empresa. Em caso de falha, não listar
+  // empresas de maneira permissiva nem permitir atribuição inválida.
+  v19EmpresasAbertura=null;
+  if(CU.perfil!=='prefeitura'){
+    let empresas,vinculos;
+    try{
+      [empresas,vinculos]=await Promise.all([
+        sbFetch('empresas?select=id,nome,consorcio_id,status&order=nome.asc'),
+        sbFetch('empresa_cidades?select=empresa_id,cidade_id')
+      ]);
+    }catch(e){
+      console.warn('[V19] Falha ao consultar vínculos de empresas:',e);
+      showToast('Não foi possível conferir empresas autorizadas por município. Tente novamente.','erro');
+      return;
+    }
+    if(!Array.isArray(empresas)||!Array.isArray(vinculos)){
+      showToast('Catálogo de empresas indisponível. Cadastro bloqueado por segurança.','erro');
+      return;
+    }
+    v19EmpresasAbertura={cidades:disponiveis,empresas,vinculos};
+  }
   const empresaInput=CU.perfil==='prefeitura'
     ? '<div style="font-size:11px;color:var(--gray-500);padding:10px;background:var(--gray-50);border-radius:6px">A empresa responsável será definida pelo consórcio.</div>'
-    : `<select id="int-emp"><option value="">Sem atribuição</option>${empresasVisiveis.map(e=>`<option value="${e.id}" ${CU.perfil==='empresa'&&e.id===CU.empresa_id?'selected':''}>${escaparCidadeHTML(e.nome)}</option>`).join('')}</select>`;
+    : '<select id="int-emp"></select>';
   document.getElementById('topbar-title').textContent='Novo chamado interno';
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-ghost" onclick="showView('chamados')">← Voltar</button>`;
   document.querySelectorAll('.sbi').forEach(s=>s.classList.remove('on'));
@@ -4374,7 +4423,7 @@ async function vNovoChamado(){
       <div class="gps-btn" onclick="captureGPS('geocode-status-int')"><span>📍</span>Usar minha localização atual (GPS)</div>
       <div id="geocode-status-int" class="geocode-status"></div>
       <div class="frow frow2" style="margin-bottom:10px">
-        <div class="field"><label>Cidade</label><select id="int-cidade" ${CU.perfil==='prefeitura'?'disabled':''}>${cityOptions}</select></div>
+        <div class="field"><label>Cidade</label><select id="int-cidade" onchange="v19AtualizarEmpresasAbertura()" ${CU.perfil==='prefeitura'?'disabled':''}>${cityOptions}</select></div>
         <div class="field"><label>Bairro</label><input type="text" id="int-bairro" placeholder="Nome do bairro"></div>
       </div>
       <div class="frow frow32">
@@ -4417,6 +4466,7 @@ async function vNovoChamado(){
     </div>
   </div>
 </div></div>`;
+  v19AtualizarEmpresasAbertura();
 }
 function selInt(el,p){document.querySelectorAll('#intProbGrid .prob-opt').forEach(o=>o.classList.remove('on'));el.classList.add('on');intProb=p;}
 // ── Autocomplete — Google Places (primário) + Nominatim (fallback) ──
@@ -4633,6 +4683,12 @@ async function salvarChamadoInterno(){
   const obs=document.getElementById('int-obs')?.value?.trim()||'';
   const empresaId=CU.perfil==='prefeitura'?null:CU.perfil==='empresa'?
     CU.empresa_id:(document.getElementById('int-emp')?.value||null);
+  if(CU.perfil!=='prefeitura' &&
+     (CU.perfil==='empresa'
+      ? !v19EmpresasPermitidasNaCidade(city.id).some(e=>e.id===CU.empresa_id)
+      : !!empresaId && !v19EmpresasPermitidasNaCidade(city.id).some(e=>e.id===empresaId))){
+    showToast('Empresa não autorizada para o município selecionado.','erro');return;
+  }
   if(!['Urbana','Rural'].includes(area)||!Number.isInteger(qtd)||qtd<1||qtd>999){
     showToast('Área ou quantidade inválida.','erro');return;
   }
