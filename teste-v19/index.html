@@ -2664,16 +2664,16 @@ function gerarExcel(tipo){
         const detalhe=srcXlSLA.map(c=>{
           let tempoH='—';
           if(c.created_at&&c.completed_at){
-            tempoH=Math.round((new Date(c.completed_at)-new Date(c.created_at))/36e5)+'h';
+            tempoH=Number(((new Date(c.completed_at)-new Date(c.created_at))/864e5).toFixed(2))+' dias';
           }
           return{
             'Protocolo':c.protocolo,'Cidade':c.cidade,'Tipo':c.tipo,
             'Status':c.status,'Empresa':c.empresa,
             'Abertura':c.created_at?new Date(c.created_at).toLocaleString('pt-BR'):c.data,
             'Conclusão':c.completed_at?new Date(c.completed_at).toLocaleString('pt-BR'):'Pendente',
-            'Tempo atendimento':tempoH,
-            'SLA restante (h)':c.sla,'SLA %':c.slaPct+'%',
-            'Dentro do prazo':c.status==='Concluído'&&c.sla>=0?'Sim':c.status==='Em atraso'?'Não':'Em andamento'
+            'Tempo atendimento (dias corridos)':tempoH,
+            'Prazo registrado (dias corridos)':c._slaHoras==null?'Não informado':Number((c._slaHoras/24).toFixed(2)),
+            'Dentro do prazo':window.v19StatusSLA?.(c).resultado==null?'Não apurável':window.v19StatusSLA?.(c).resultado?'Sim':'Não'
           };
         });
         const wsResumo=XLSX.utils.json_to_sheet(resumo);
