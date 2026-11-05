@@ -187,3 +187,11 @@ Evidência: capturas de tela apresentadas pelo operador, no banco de homologaç�
 - **Aprovado nos cenários específicos:** autorização da própria empresa e do gestor, conclusão por RPC, histórico, identificação do responsável, status final e data. A captura final não comprova isoladamente novo F5 após a conclusão da Alfa B; solicitar se necessário.
 - **Ainda pendente:** ensaio negativo de conclusão duplicada no fluxo atual (já havia testes isolados de servidor), isolamento reverso Alfa A versus B, teste de Garantia LED na interface atual e investigação de SLA `Não apurável (estimativa)`. Não inferir cobertura universal de papéis/transições.
 - Não criar nem alterar dados de produção. V18 permanece fora do escopo.
+
+## Garantia LED pela interface — pré-verificação e SQL 57 (05/11/2026)
+
+- Login **Técnico Garantia Alfa** acessou **Chamados em Garantia LED** e viu **2 chamados fictícios**: `V19-A-1` (Empresa Alfa A) e `V19-A-2` (Empresa Alfa B), ambos **Concluído**. Isso confirma leitura do histórico visível, **não demonstra nova conclusão via UI**.
+- Criado `sql/v19/57_MASSA_GARANTIA_LED_INTERFACE_HOMOLOGACAO.sql` na branch `desenvolvimento-v19`, commit `75b941084e0dd0a291c4de41268d35a668c18fec`. O arquivo **NÃO FOI EXECUTADO** no Supabase.
+- SQL 57 prepara **dois novos chamados fictícios pendentes** (um Alfa A e um Alfa B), guardados por consórcio, RPCs, contas vinculadas e cidade habilitada. A transação falha se a fixture já existir, para impedir repetição; não toca dados antigos, produção ou políticas.
+- Próximo passo: operador executa **uma única vez** SQL 57 no **projeto Supabase V19 de homologação**, compartilha apenas a tabela final (esperado 2 linhas `Aguardando Garantia LED`, `conclusao_pendente=true` e 0 históricos) — jamais compartilhe chaves/senhas.
+- Só então atualizar F5 no login Garantia Alfa e testar a primeira conclusão na interface. Depois testar segunda com empresa atribuída, validando histórico/persistência e isolamento. V18 não tocada.
