@@ -498,3 +498,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Aprovado parcialmente:** registro aparece na lista isolada da Empresa Alfa B e vínculo visual à empresa correta. Imagem ainda mostra `SLA não apurável` no instante após voltar do formulário, embora a regra Alfa seja 48h (2 dias corridos). Não declarar SLA do registro aprovado sem consulta ao banco.
 - Há indício repetido de apresentação/atualização transitória do SLA após cadastro (também observado no Gestor e Prefeitura), mas **causa exata não comprovada**; atualização do relógio e da lista foi preparada na branch. Não supor que a cópia local incorpora a última alteração.
 - Próximo passo único para usuário: **F5** na mesma sessão Empresa Alfa B, abrir Chamados e confirmar se o novo registro passa a apresentar **Até 2 dias restantes**, sem repetir o cadastro. Depois consulta SQL somente leitura para validar `sla_horas=48`, `empresa_id` e histórico único.
+
+## Empresa Alfa B — SLA após F5 confirmado na interface (05/11/2026)
+
+- Operador enviou print com login `Empresa Alfa B`, no menu `Chamados`, após **F5**, que mostra o chamado interno novo do bairro `Homologação Empresa Alfa B V19` com `Recebido`, empresa `TESTE V19 - Empresa Alfa B` e SLA verde **“Até 2 dias restantes (estim.)”**. A lista contém 6 chamados para essa empresa, como na captura anterior.
+- **Aprovado:** persistência visual do chamado, vinculação empresarial e exibição de prazo urbano após F5; não houve duplicação.
+- **Pendente:** comportamento de SLA no retorno imediato após cadastrar sem F5; no print anterior aparecia “SLA não apurável”. A cópia local pode não incorporar ainda a correção de tolerância de relógio; não declarar correção aprovada.
+- **Próximo teste:** executar SELECT de somente leitura no Supabase V19 para o chamado identificado pelo bairro, juntando `empresas`, `consorcios` e contagem do histórico; validar `sla_horas=48`, empresa correta e evento de histórico único. Não repetir cadastro.
