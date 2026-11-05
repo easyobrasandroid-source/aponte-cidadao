@@ -278,3 +278,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Print recebido do operador logado como **Gestor Consórcio Alfa**, acessando a versão local atualizada `teste-v19/index.html` → menu **SLA**.
 - Na interface, consórcio **TESTE V19 - Consórcio Alfa** e regra `Padrão geral` exibem **urbano 2 dias corridos**, **rural 5 dias corridos**, alertas em branco (—), campos para edição e botão **Salvar prazos gerais** visíveis para esse perfil.
 - **Aprovado: exibição/leitura e disponibilidade de controles de edição**; captura não prova ainda gravação pela RPC. Teste seguinte: manter 2 e 5, clicar Salvar, aceitar confirmação, enviar resultado; depois recarregar com F5 para conferir persistência. NÃO alterar os prazos provisórios nesta etapa.
+
+## SLA — gravação e persistência pela interface do gestor (05/11/2026)
+
+- Operador confirmou que **Gestor Consórcio Alfa** clicou em `Salvar prazos gerais`, aceitou a confirmação e recebeu **mensagem de sucesso** do aplicativo, usando prazo **urbano 2 dias corridos** e **rural 5 dias corridos**.
+- Operador posteriormente informou que os valores **permaneceram após F5**, confirmando persistência pela interface. Não houve print posterior ao F5 neste turno; evidência é o relato do operador.
+- **Aprovado: gravação autorizada e persistência** para o perfil Consórcio Alfa. Permanecem por verificar: perfil Master, bloqueio de outros perfis por JWT e isolamento de consórcios sem autorização. A regra ainda não é automaticamente aplicada aos chamados criados.
+- Próximo teste de interface (somente leitura): login no perfil **Master**, acessar o menu SLA e observar se pode selecionar Consórcio Alfa e se a tabela apresenta os valores 2/5 dias, sem salvar nem modificar nada.
