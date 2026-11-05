@@ -143,7 +143,7 @@ window.vSLA=async function(b,t,a,consId){
       '</div>'+
       '<button class="btn btn-save" id="v19-sla-salvar" onclick="v19SalvarSLA()">💾 Salvar prazos gerais</button>'+
       '</div>':
-      (!padrao?'<p style="font-size:12px;color:var(--amber);margin-top:14px">Regra geral ainda não cadastrada. Aplique e valide o SQL 59 exclusivamente na homologação V19.</p>':'')+
+      (!padrao?'<p style="font-size:12px;color:var(--amber);margin-top:14px">Este consórcio ainda não possui uma regra geral de SLA. Os prazos do Consórcio Alfa não são compartilhados. Cadastre uma regra própria deste consórcio por procedimento de homologação específico.</p>':'')+
       (!admin()&&padrao?'<div style="border-top:1px solid #E5E7EB;margin-top:16px;padding-top:12px">'+
       '<p style="font-size:12px;color:var(--gray-500)">Homologação V19: este diagnóstico envia valores inválidos (0 dias) para testar se a RPC rejeita seu perfil. Nenhuma regra pode ser salva com esses valores.</p>'+
       '<button class="btn btn-ghost" id="v19-sla-teste-bloqueio" onclick="v19TestarBloqueioSLARPC()">🔒 Testar bloqueio de edição pelo banco</button>'+
@@ -204,7 +204,7 @@ window.v19SalvarSLA=async function(){
   }
   const padrao=rules.find(r=>r.tipo_problema==='PADRAO_GERAL');
   if(!padrao){
-    showToast('🔒 Regra PADRAO_GERAL não existe: executar primeiro SQL 59.','erro');return;
+    showToast('🔒 Regra PADRAO_GERAL não cadastrada para este consórcio. Não repita o SQL 59, que configurou somente o Consórcio Alfa.','erro');return;
   }
   const urb=Number(document.getElementById('v19-sla-urb')?.value);
   const rur=Number(document.getElementById('v19-sla-rur')?.value);
