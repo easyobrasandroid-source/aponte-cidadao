@@ -5,6 +5,10 @@
   const fmtData=v=>v?new Date(v).toLocaleString('pt-BR'):'—';
   const num=v=>Number.isFinite(Number(v))?Number(v):0;
   const money=v=>'R$ '+num(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // A estrutura legado armazena prazos em horas. Exibir em dias corridos,
+  // preservando a comparação exata em milissegundos/horas.
+  const dias=h=>h===null||h===undefined||h===''||!Number.isFinite(Number(h))?
+    'Não informado':Number((Number(h)/24).toFixed(2));
   const statusSLA=c=>{
     const prazo=Number(c._slaHoras);
     if(c._slaHoras==null || !Number.isFinite(prazo) || prazo<=0 || !c.created_at)
@@ -65,16 +69,16 @@
       return {'Protocolo':c.protocolo,'Cidade':c.cidade,'Problema':c.tipo,
         'Empresa':c.empresa,'Status':c.status,'Aberto em':fmtData(c.created_at),
         'Concluído em':fmtData(c.completed_at),
-        'Prazo registrado (h)':c._slaHoras??'Não informado',
-        'Tempo observado (h)':a.tempo==null?'Não apurável':Number(a.tempo.toFixed(2)),
+        'Prazo registrado (dias corridos)':dias(c._slaHoras),
+        'Tempo observado (dias corridos)':a.tempo==null?'Não apurável':Number((a.tempo/24).toFixed(2)),
         'Resultado estimado':a.estado};
     });
     return dados.map(c=>({
       'Protocolo':c.protocolo,'Cidade':c.cidade,'Bairro':c.bairro,
       'Endereço':c.endereco,'Tipo':c.tipo,'Status':c.status,'Empresa':c.empresa,
       'Data abertura':fmtData(c.created_at),'Data conclusão':fmtData(c.completed_at),
-      'Área':c.area,'Origem':c.origem,'Prazo registrado (h)':c._slaHoras??'Não informado',
-      'Situação SLA (horas corridas)':statusSLA(c).estado
+      'Área':c.area,'Origem':c.origem,'Prazo registrado (dias corridos)':dias(c._slaHoras),
+      'Situação SLA (dias corridos)':statusSLA(c).estado
     }));
   }
   const label={chamados:'Chamados',estoque:'Estoque',sla:'SLA'};
@@ -95,12 +99,12 @@
         const noPrazo=avaliados.filter(a=>a.resultado===true).length;
         const resumo=[{'Indicador':'Chamados filtrados','Valor':dados.length},
           {'Indicador':'Com prazo e datas suficientes','Valor':avaliados.length},
-          {'Indicador':'Dentro do prazo estimado (horas corridas)','Valor':noPrazo},
-          {'Indicador':'Fora do prazo estimado (horas corridas)','Valor':avaliados.length-noPrazo},
+          {'Indicador':'Dentro do prazo estimado (dias corridos)','Valor':noPrazo},
+          {'Indicador':'Fora do prazo estimado (dias corridos)','Valor':avaliados.length-noPrazo},
           {'Indicador':'Não apuráveis / pausados','Valor':dados.length-avaliados.length},
           {'Indicador':'Cumprimento estimado entre apuráveis','Valor':
             avaliados.length?(100*noPrazo/avaliados.length).toFixed(1)+'%':'Não apurável'},
-          {'Indicador':'Nota','Valor':'Estimativa por horas corridas; não contempla calendário útil ou duração de pausas.'}];
+          {'Indicador':'Nota','Valor':'Estimativa por dias corridos (1 dia = 24 horas); sábados, domingos e feriados são contados. Pausas sem histórico de duração tornam o SLA não apurável.'}];
         const wr=XLSX.utils.json_to_sheet(resumo);
         XLSX.utils.book_append_sheet(wb,wr,'Metodologia');
       }
@@ -119,9 +123,9 @@
       const table='<table><thead><tr>'+headers.map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+
         columns.map(x=>'<tr>'+headers.map(k=>'<td>'+esc(x[k])+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
       let note='';
-      if(tipo==='sla')note='<p>Metodologia: estimativa em horas corridas a partir da abertura e conclusão. '+
+      if(tipo==='sla')note='<p>Metodologia: estimativa em dias corridos (1 dia = 24 horas), incluindo fins de semana e feriados, a partir da abertura e conclusão. '+
         'Registros sem prazo, com dados inválidos ou SLA pausado são não apuráveis; '+
-        'não substitui aferição contratual em dias úteis.</p>';
+        'não substitui a validação dos prazos previstos no contrato.</p>';
       if(tipo==='estoque')note='<p>O relatório apresenta saldo atual e saídas líquidas registradas. '+
         'Não pressupõe que contratado menos disponível seja consumo. Movimentos anteriores '+
         'ao registro de histórico podem estar ausentes.</p>';
@@ -162,7 +166,7 @@
         if(sla){
           sla.insertAdjacentHTML('beforeend',
             '<p style="font-size:11px;color:var(--gray-600);margin-top:8px">'+
-            'Prazo estimado por horas corridas: '+overdue+' fora do prazo; '+
+            'Prazo estimado por dias corridos: '+overdue+' fora do prazo; '+
             (count.length-anal.length)+' não apurável(is) / pausado(s). '+
             'O percentual de conclusão exibido acima não é taxa de SLA.</p>');
         }
