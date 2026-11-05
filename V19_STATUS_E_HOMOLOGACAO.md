@@ -454,3 +454,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Corrigido protocolo abreviado na lista: preservar prefixo + sufixo específico, evitando duplicidade de códigos visualmente truncados e o prefixo `V19--V19I`; o protocolo real no Supabase não foi alterado.
 - Commits apenas na branch V19: `ad86a3158cf159d6a3cb4b4b39c71ba184338013`, `3116872c59f80a455cee7266946c398c42a4657b`, `3bededf512eb708505677d0d23dceca79acff7e0`. **V18 e bancos não modificados**. A sintaxe JS foi conferida, mas ainda aguarda teste do usuário com novo ZIP.
 - Próximo teste único: baixar ZIP atualizado da branch V19, abrir `teste-v19/index.html`, entrar Gestor Alfa e verificar dois chamados já existentes, com **“Até 2 dias restantes”** urbano e **“Até 5 dias restantes”** rural, sem novo chamado nem SQL. Depois testar atualização imediata com criação autorizada de chamado sintético, caso necessário.
+
+## SLA em dias inteiros — confirmação no Chrome (05/11/2026)
+
+- Print do operador em `Chamados` autenticado como **Gestor Consórcio Alfa**, novo ZIP da `desenvolvimento-v19`, **10 chamados** no total.
+- Os dois chamados novos, `V19I-7BAF895492A843AD898522E9EE4B8486` rural e `V19I-B34E69091ABE419797D63A0D6BC0A0A2` urbano, aparecem em verde: respectivamente **“✓ Até 5 dias restantes (estim.)”** e **“✓ Até 2 dias restantes (estim.)”**. Protocolos abreviados diferentes, status Recebido.
+- **APROVADO pelo print:** arredondamento de apresentação do SLA em dias inteiros e melhoria do texto do protocolo; banco mantém valores exatos **120h e 48h** de testes anteriores. Os oito registros anteriores seguem sem prazo retroativo.
+- **Ainda pendente:** validar a correção que recarrega a lista imediatamente após nova abertura, sem precisar pressionar F5. Próximo teste seguro deve ser feito com novo chamado fictício em outro perfil autorizado, se disponível, e verificar logo depois do retorno do formulário sem recarregar; também testar autorização da Prefeitura no próprio município e sem atribuição de empresa.
