@@ -483,3 +483,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Aprovado:** criação interna autenticada pela Prefeitura no próprio município, SLA automático urbano, vínculo do solicitante, ausência de empresa atribuída e histórico único. Não generalizar para outras prefeituras sem teste.
 - **Pendente:** demonstrar atualização de SLA imediatamente após nova abertura **sem recarregar a página**. A divergência anterior é transitória; hipótese de relógio de browser foi tratada em `teste-v19/index.html`, mas o cenário exato ainda não foi repetido com novo ZIP/sem F5. Evitar duplicações desnecessárias.
 - **Próximo teste:** conta Empresa Alfa B, abrir formulário de Novo chamado e inspecionar cidade e empresa selecionáveis sem gravar, antes de testar abertura empresarial.
+
+## Empresa Alfa B — formulário interno com cidade restrita e empresa própria (05/11/2026)
+
+- Print de usuário `Empresa Alfa B` logado na V19, tela `Novo chamado interno`, cidade com seletor **aberto** mostrando somente `Municipio Alfa 1`.
+- Campo **Empresa responsável** exibe selecionada `TESTE V19 - Empresa Alfa B`; seletor de empresas **não foi aberto** na captura, logo a imagem não comprova sozinho todas as alternativas disponíveis. Backend SQL62 limita a empresa à própria identidade.
+- Perfil exibido `empresa`; tipo inicial `Lâmpada apagada`, área `Urbana`, quantidade `1`; organização ainda aparece `—` na caixa superior (correção cosmética futura).
+- **Aprovado no frontend:** abertura do formulário pelo perfil Empresa Alfa B, seleção de cidade limitada e empresa pré-selecionada. Não afirmar ainda sucesso de criação, SLA ou autorização do servidor para esta conta.
+- **Próximo ensaio:** criar um único chamado sintético urbano com Empresa Alfa B, município Alfa 1, bairro `Homologação Empresa Alfa B V19`, empresa própria; observar o SLA logo após retorno à lista, **sem F5**. Se erro, não tentar segundo clique; verificar resposta e possível registro no banco.
