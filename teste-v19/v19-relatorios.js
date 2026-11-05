@@ -9,7 +9,7 @@
   // preservando a comparação exata em milissegundos/horas.
   const dias=h=>h===null||h===undefined||h===''||!Number.isFinite(Number(h))?
     'Não informado':Number((Number(h)/24).toFixed(2));
-  const statusSLA=c=>{
+  const statusSLA=window.v19StatusSLA || (c=>{
     const prazo=Number(c._slaHoras);
     if(c._slaHoras==null || !Number.isFinite(prazo) || prazo<=0 || !c.created_at)
       return {estado:'Não apurável',resultado:null,tempo:null};
@@ -27,7 +27,7 @@
       // Cumprimento só é medido quando existe uma data de conclusão verificável.
       resultado:finished?ok:null,tempo:hours,prazo,
       vencido:!ok};
-  };
+  });
   window.v19StatusSLA=statusSLA;
   let movimientos = [];
   let movementsPartial=false;
