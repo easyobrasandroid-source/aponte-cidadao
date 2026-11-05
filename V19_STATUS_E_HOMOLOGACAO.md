@@ -315,3 +315,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Sem campos de edição e sem botão Salvar**: aprovado controle de interface para o perfil garantia.
 - Isto **não prova o bloqueio de uma chamada REST direta** por JWT deste perfil; o backend `v19_salvar_sla_padrao` tem restrição estática por `master`/`consorcio`, ainda sem teste negativo de execução com JWT real.
 - Testes positivos: gravação e persistência por Master e Gestor Consórcio Alfa confirmadas pelo operador. Testes negativos de interface: Empresa Alfa B e Técnico Garantia Alfa aprovados.
+
+## SLA — teste de negativa da RPC sem gravação preparado (05/11/2026)
+
+- Print do `Técnico Garantia Alfa` na tela SLA: pode ler regra `PADRAO_GERAL` (2 dias urbanos e 5 rurais); **não há campos de edição nem botão Salvar**. Aprovada restrição visual.
+- Criado diagnóstico de permissão exclusivamente para interface `teste-v19/v19-config.js` da branch `desenvolvimento-v19` (commit `5be514e13e9013aff7382a62e8d8a3ed123aca2a`).
+- Para perfis não administradores, botão **Testar bloqueio de edição pelo banco** envia tentativa real à RPC `v19_salvar_sla_padrao`, fornecendo `p_urb_dias=0`, `p_rur_dias=0`. Essa combinação é **sempre inválida** e nunca pode produzir atualização, mesmo diante de falha de autorização. SQL 59 checa a permissão do usuário **antes** do valor dos dias, portanto resposta `PERFIL_NAO_AUTORIZADO` ou `CONSORCIO_NAO_AUTORIZADO` indica recusa pelo perfil. Resposta de validação `PRAZO_EM_DIAS_INVALIDO` revela que a verificação de permissão foi ultrapassada e demanda investigação, sem alteração de prazo.
+- A UI diferencia **APROVADO**, **inconclusivo** e **falha crítica**. Esta alteração está no GitHub, não no ZIP local; foi conferida sintaxe JavaScript, mas **não testada ainda com sessão JWT do usuário**.
+- Próximo passo único: atualizar ZIP V19, fazer login `Técnico Garantia Alfa`, entrar em SLA e clicar **Testar bloqueio de edição pelo banco**, enviar captura do resultado. Não compartilhar chave pública, JWT ou senha no chat.
