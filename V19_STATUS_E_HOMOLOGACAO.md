@@ -300,3 +300,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Confirmado por relato do operador: regra `PADRAO_GERAL` no Consórcio Alfa permaneceu **urbano 2 dias corridos** e **rural 5 dias corridos**, após salvar e recarregar.
 - **Aprovado: persistência Master após F5.** Em conjunto com a homologação anterior do Gestor Consórcio Alfa, os dois perfis privilegiados conseguiram gravar e persistir valores inalterados via interface.
 - Próximo teste único: login **Empresa Alfa B**, observar se o menu `SLA` é oferecido; captura de tela; não gravar. Isso é apenas teste visual de autorização, não substitui teste negativo de RPC com JWT de empresa.
+
+## SLA — persistência do Master e edição oculta para Empresa Alfa B
+
+- Em 05/11/2026, operador confirmou por mensagem **"sim"** que, após F5 no perfil Master, os prazos gerais Alfa permaneceram **2 dias corridos urbano / 5 dias corridos rural**. Evidência declarada pelo operador.
+- Print posterior do usuário com login **Empresa Alfa B** no menu SLA mostra regra `PADRAO_GERAL` de Consórcio Alfa, valores 2/5, **sem campos de alteração e sem botão Salvar**. **Aprovado isolamento de edição na interface para perfil Empresa.**
+- Não inferir bloqueio backend apenas desse print; o `v19_salvar_sla_padrao` verifica os perfis no PostgreSQL, mas deve ser submetido a ensaio negativo com JWT real da empresa sem alterar dados.
+- Próximo teste visual sugerido: perfil **Técnico Garantia Alfa**, menu SLA, certificar controles de edição ausentes.
