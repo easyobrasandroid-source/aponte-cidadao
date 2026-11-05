@@ -176,3 +176,14 @@ Capturas do usuário para o protocolo `V19-TESTE-CONSUMO-ALFA-B-1` confirmaram:
 - UX: círculos clicáveis de status comum passam a respeitar matriz do SQL 28, evitando transições inválidas no frontend (o servidor continua a autoridade).
 - Testes estáticos: sintaxe do JavaScript inline válida; guardas puras de interface verificadas em **11/11 cenários**, incluindo papel da garantia, empresa errada, bloqueio de conclusão duplicada e retorno permitido `Aguard. material → Em execução`.
 - **Ainda sem homologação do botão Concluir no navegador ou Supabase** desde o commit. A versão ZIP local anterior continua bloqueando a etapa final; operador deve baixar o ZIP mais recente. Próxima etapa recomendada: retornar o chamado fictício `V19-A-A` para **Em execução** e confirmar histórico após F5; depois abrir a versão nova para pré-verificar conclusão e executar apenas uma vez, com confirmação do usuário. Não executar em produção.
+
+## Homologação pela interface — conclusões pelo consórcio e pela empresa (05/11/2026)
+
+Evidência: capturas de tela apresentadas pelo operador, no banco de homologação V19.
+
+- Chamado `V19-TESTE-RLS-ALFA-A` (listagem `V19-A-A`): o Gestor Consórcio Alfa concluiu em 05/11/2026 07:02:11. Estado `Concluído` persistiu após F5. Timeline exibiu **5 eventos**, último `Em execução → Concluído` e responsável `Gestor Consórcio Alfa`.
+- Login **Empresa Alfa B**: listagem exibiu apenas **4 chamados** da própria empresa, sem os 2 chamados da Alfa A; isolamento visual de leitura aprovado no cenário.
+- Chamado `V19-TESTE-RLS-ALFA-B` (listagem `V19-A-B`): Empresa Alfa B alterou `Recebido → Em programação → Em execução → Concluído`. F5 confirmou persistência da primeira mudança e histórico; última conclusão registrada em **05/11/2026 07:45:17**, como `Concluído`, com **3 eventos** e último `Em execução → Concluído`, responsável `Empresa Alfa B`. O botão Concluir aparece oculto na tela final.
+- **Aprovado nos cenários específicos:** autorização da própria empresa e do gestor, conclusão por RPC, histórico, identificação do responsável, status final e data. A captura final não comprova isoladamente novo F5 após a conclusão da Alfa B; solicitar se necessário.
+- **Ainda pendente:** ensaio negativo de conclusão duplicada no fluxo atual (já havia testes isolados de servidor), isolamento reverso Alfa A versus B, teste de Garantia LED na interface atual e investigação de SLA `Não apurável (estimativa)`. Não inferir cobertura universal de papéis/transições.
+- Não criar nem alterar dados de produção. V18 permanece fora do escopo.
