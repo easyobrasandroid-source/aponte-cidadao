@@ -353,3 +353,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Valores permanecem em **2 dias corridos urbano / 5 dias corridos rural**; campos de edição e botão Salvar para o próprio consórcio.
 - **APROVADO: isolamento de seleção e leitura de consórcios no frontend** para Gestor Alfa. Não inferir isolamento de escrita por JWT para consórcio Beta a partir da lista do seletor; o backend bloqueia esse caso pelo código SQL59, mas aguarda teste com identidade real.
 - Próximo ensaio seguro: obter UUID do Consórcio Beta por consulta **somente leitura** no SQL Editor e usá-lo em tentativa com dias inválidos para testar o bloqueio `CONSORCIO_NAO_AUTORIZADO`, sem alterar regras.
+
+## SLA — teste negativo entre Gestor Alfa e Consórcio Beta preparado (05/11/2026)
+
+- Operador consultou no Supabase V19 (somente leitura) o identificador de consórcio fictício Beta, `9674d593-7d2b-44da-8d4d-97070bc95aca` (`teste-v19-beta`).
+- Adicionado à interface na branch `desenvolvimento-v19`, commit `1e4e280e7efd8d1c0164d3ab37c6579cae2fa6fe`, botão exclusivo do perfil `consorcio`: **Testar bloqueio entre consórcios**.
+- O diagnóstico faz uma requisição autenticada `v19_salvar_sla_padrao` passando `p_consorcio_id` do Beta e prazos `p_urb_dias=0`, `p_rur_dias=0` (inválidos por design). A RPC deve retornar `CONSORCIO_NAO_AUTORIZADO` ao Gestor Alfa, antes de avaliar os prazos. **Nenhum UPDATE é possível com 0/0 dias** mesmo diante de falha da checagem de consórcio.
+- Somente a resposta `CONSORCIO_NAO_AUTORIZADO` é aceita pelo diagnóstico como aprovação; outra exceção resulta em **inconclusivo**. Alteração submetida e verificada sintaticamente, **não testada ainda com JWT real no navegador**.
+- Próximo passo: baixar novo ZIP branch V19, fazer login como Gestor Consórcio Alfa, abrir SLA, clicar o novo botão e enviar print do retorno. Não executar SQL59 novamente nem alterar dados do banco.
