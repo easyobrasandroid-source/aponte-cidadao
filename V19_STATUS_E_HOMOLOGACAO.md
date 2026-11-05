@@ -424,3 +424,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **APROVADO**: criação interna urbana, SLA automático no banco, apresentação em dias corridos e persistência após reload. 1,99 dias é saldo estimado desde a abertura, não erro de prazo.
 - Problema visual menor identificado no rótulo curto do protocolo gerado `V19I-` (renderização com prefixo adicional) — não afeta o UUID nem o valor armazenado; corrigir em revisão futura da UI, preservando protocolo integral no banco.
 - **Próximo teste:** criar apenas um novo chamado sintético **Rural** no Consórcio Alfa via mesma UI, confirmar 120 horas (5 dias) e 1 histórico no SQL; não alterar regras, não usar registros reais, evitar segundo clique.
+
+## Pendência UX — prazo SLA em dias inteiros (05/11/2026)
+
+- Responsável solicitou que a visualização do SLA deixe de apresentar decimais (`1,99 dias restantes`), preferindo contagem **em dias inteiros**, como `2 dias`, `1 dia`, `0 dias`.
+- **Pendente de implementação após testes atuais**, para não obrigar novo ZIP durante a homologação do chamado rural.
+- Manter armazenamento, vencimento e verificação do SLA com precisão de timestamp/horas no banco. Ajustar apenas apresentação e esclarecer limiares de arredondamento, especialmente prazo inferior a 24h e transição para atraso, para não transmitir prazo enganoso. Conferir listagem, detalhes e relatórios.
+- O próximo teste em andamento continua sendo o chamado **Rural Alfa**, esperado SLA `120 horas` = `5 dias corridos`, com registro único de histórico.
