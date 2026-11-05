@@ -4538,7 +4538,9 @@ function confirmarPontoMinimap(){
   }
 }
 
+let v19AberturaInternaOcupada=false;
 async function salvarChamadoInterno(){
+  if(v19AberturaInternaOcupada)return;
   if(!CU||!['master','consorcio','prefeitura','empresa'].includes(CU.perfil)){
     showToast('Seu perfil não pode abrir chamados internos.','erro');return;
   }
@@ -4560,6 +4562,8 @@ async function salvarChamadoInterno(){
   if(!['Urbana','Rural'].includes(area)||!Number.isInteger(qtd)||qtd<1||qtd>999){
     showToast('Área ou quantidade inválida.','erro');return;
   }
+  v19AberturaInternaOcupada=true;
+  if(botao){botao.disabled=true;botao.textContent='Registrando no Supabase…';}
   let lat=null,lng=null,loc_src='manual';
   if(window._locSrc==='minimap_confirmed'&&
      Number.isFinite(window._gpsLat)&&Number.isFinite(window._gpsLng)){
@@ -4580,7 +4584,6 @@ async function salvarChamadoInterno(){
       }
     }catch(e){console.warn('[V19] geocodificação:',e.message);}
   }
-  if(botao){botao.disabled=true;botao.textContent='Registrando no Supabase…';}
   try{
     // Todos os campos administrativos (consórcio, protocolo, status,
     // abertura, SLA e autor do histórico) vêm exclusivamente do banco.
@@ -4605,6 +4608,7 @@ async function salvarChamadoInterno(){
     console.error('[V19] Falha ao criar chamado interno:',e);
     showToast('❌ Abertura não confirmada. Verifique a listagem antes de tentar novamente. '+e.message,'erro');
   }finally{
+    v19AberturaInternaOcupada=false;
     if(botao){botao.disabled=false;botao.textContent='✅ Registrar chamado →';}
   }
 }
