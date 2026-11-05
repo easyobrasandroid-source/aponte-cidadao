@@ -212,3 +212,11 @@ Evidência: capturas de tela apresentadas pelo operador, no banco de homologaç�
 - Assim foram aprovados os dois cenários positivos de conclusão de Garantia LED pela interface: **Técnico Garantia Alfa** sobre chamado Alfa A e **empresa responsável Alfa B** sobre chamado Alfa B, com identificação e histórico correto.
 - Não há evidência inequívoca de F5 após esse último teste; validar persistência em recarregamento explicitamente.
 - Pendências antes da homologação ampla: tentativas negativas de operação por empresa não responsável/consórcio cruzado, prevenção de segunda conclusão pela interface/API atual, SLA marcado `Não apurável (estimativa)`, e validação visual da abreviação de protocolo corrigida no GitHub mas ainda não implantada na cópia local.
+
+## Garantia LED — persistência após F5 confirmada (05/11/2026)
+
+- Operador pressionou F5 e enviou capturas da aba Histórico e Resumo da **Empresa Alfa B**, chamado `V19-TESTE-UI-GARANTIA-ALFA-B-57`.
+- Após atualização: status **Concluído**, mesma data/hora de conclusão **05/11/2026 08:07:03**, mesmo responsável **Empresa Alfa B**, e **um único evento** de histórico `Aguardando Garantia LED → Concluído`.
+- A ação de conclusão permanece indisponível no drawer. **Persistência após F5 aprovada** nesse cenário; isso não substitui teste de repetição direta da RPC como usuário autenticado.
+- Cenários positivos de conclusão aprovados na interface até aqui: gestor conclui chamado comum; empresa responsável conclui chamado comum; técnico de garantia conclui LED; empresa responsável conclui LED.
+- Ainda pendente para declaração de pronto para produção: inspeção consolidada de permissões negativas (incluindo impossibilidade de concluir garantia de outra empresa), anti-duplicação pela RPC, cálculo de SLA (atualmente 'Não apurável (estimativa)'), correção de protocolo abreviado na cópia local e demais módulos não cobertos.
