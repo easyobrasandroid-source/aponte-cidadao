@@ -1051,6 +1051,8 @@ async function esqueciSenha(){
 // Usado no logout e quando a sessão expira e não pode ser renovada.
 function limparEstadoOperacional(){
   CU=null; CC=null;
+  // Descartar também vínculos temporários de empresas da sessão anterior.
+  v19EmpresasAbertura=null;
   DB={ chamados: [], historico: {}, usuario: null, materiais: null, usuarios: null, auditoria: [] };
   _cidadesMap=null; _cidadeConsorcio=null;   // forçam recarga do catálogo no próximo uso
   try{sessionStorage.removeItem(V19_SESSION_KEY);}catch(e){}
