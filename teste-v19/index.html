@@ -1261,9 +1261,9 @@ function vChamados(b,t,a){
     if(c.status==='Concluído')return {
       txt:r.resultado?'✓ Concluído no prazo (estim.)':'✗ Concluído fora do prazo (estim.)',
       cls:r.resultado?'sla-ok':'sla-late',pct:100};
-    if(rest<0)return{txt:'✗ Atrasado '+Math.ceil(Math.abs(rest))+'h (estim.)',cls:'sla-late',pct:100};
-    if(rest<12)return{txt:'⚠ '+Math.floor(rest)+'h restantes (estim.)',cls:'sla-warn',pct};
-    return{txt:'✓ '+Math.floor(rest)+'h restantes (estim.)',cls:'sla-ok',pct};
+    if(rest<0)return{txt:'✗ Atrasado '+(Math.abs(rest)/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias (estim.)',cls:'sla-late',pct:100};
+    if(rest<12)return{txt:'⚠ '+(Math.max(0,rest)/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias restantes (estim.)',cls:'sla-warn',pct};
+    return{txt:'✓ '+(rest/24).toLocaleString('pt-BR',{maximumFractionDigits:2})+' dias restantes (estim.)',cls:'sla-ok',pct};
   }
 
   function fmtDT(c){
