@@ -257,3 +257,18 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Integração de interface preparada: `teste-v19/index.html` adiciona RPC à allowlist autenticada e `teste-v19/v19-config.js` mostra dois campos de dias inteiros (1–365) com confirmação e salvamento via RPC; demais regras permanecem somente para leitura. Correções passaram validação sintática de JavaScript, **mas não foram testadas por navegador nem pelo banco**.
 - SQL 59 **não altera `chamados.sla_horas` existentes, não altera chamados concluídos, nem instala automaticamente atribuição do prazo para novos chamados**. Esse último mecanismo será integrado ao fluxo seguro de criação de chamados V19, ainda pendente. Por enquanto, chamadas antigas sem prazo continuam como "SLA não apurável", corretamente.
 - Próximo passo operacional único: executar SQL 59 **uma vez no projeto V19 de homologação** pelo SQL Editor e enviar resultado da consulta diagnóstica (8 verificações). Não precisa baixar o ZIP até terminarmos validação do backend.
+
+## SQL 59 — execução confirmada no projeto de homologação (05/11/2026)
+
+- Operador enviou CSV do diagnóstico do `sql/v19/59_SLA_PADRAO_DIAS_CORRIDOS_SEGURANCA_HOMOLOGACAO.sql` com **8/8 OK**:
+  1. Projeto Alfa V19 encontrado;
+  2. Regra `PADRAO_GERAL` única para Alfa;
+  3. Urbano 48 horas = 2 dias corridos;
+  4. Rural 120 horas = 5 dias corridos;
+  5. Alertas `NULL`, sem pressupor valores;
+  6. RPC de edição executável por `authenticated`;
+  7. RPC de edição negada a `anon`;
+  8. Escrita direta da tabela SLA negada a `authenticated`.
+- **Aprovado: instalação/diagnóstico SQL59.** Não afirmar ainda que a edição por perfil autorizado no navegador ou aplicação automática de SLA a chamados novos foram testadas.
+- Próximo teste: obter o ZIP atualizado da branch `desenvolvimento-v19` e abrir `teste-v19/index.html` como **Gestor Consórcio Alfa**. Navegar até SLA e verificar regra geral **2 e 5 dias** e os controles para editar, sem gravar nesta primeira conferência. Pode exigir reinserir a chave `sb_publishable_` (somente no navegador) porque o cache usa `sessionStorage`.
+- Atenção: o SLA dos 8 chamados antigos permanece "não apurável" porque foram criados antes da regra, e a integração de atribuição automática futura ainda não foi instalada.
