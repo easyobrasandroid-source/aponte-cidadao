@@ -1610,7 +1610,8 @@ function abrirDrawer(id){
   document.getElementById('dw-title').textContent=`${c.tipo} — ${c.qtd} unidade(s)`;
   const sl=window.v19StatusSLA?.(c);
   const sc=sl?.estado==='Em atraso'||sl?.estado==='Concluído fora do prazo'?
-    'var(--red)':sl?.resultado===true?'var(--green)':'var(--amber)';
+    'var(--red)':(sl?.estado==='Em andamento no prazo'||sl?.resultado===true)?
+    'var(--green)':'var(--amber)';
   const descricaoSLA=sl?.estado||'Não apurável';
   document.getElementById('dw-chips').innerHTML=`<span class="tag ${stm[c.status]||'tag-gray'}">${c.status}</span><span style="font-size:11px;color:${sc};font-weight:600">⏱ ${descricaoSLA} (estimativa)</span><span style="font-size:11px;color:var(--gray-400)">📍 ${c.cidade}</span>`;
   const stepLbls=['Recebido','Programado','Em execução','Aguard. mat.','Concluído'],stepIcos=['✓','✓','⚡','📦','✅'];
