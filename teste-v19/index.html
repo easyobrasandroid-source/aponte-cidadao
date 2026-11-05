@@ -1299,9 +1299,9 @@ function vChamados(b,t,a){
         cls:'sla-late',pct:100};
     }
     const diasRestantes=Math.ceil(rest/24);
-    const unidade=diasRestantes===1?' dia':' dias';
-    if(rest<12)return{txt:'⚠ Até '+diasRestantes+unidade+' restantes (estim.)',cls:'sla-warn',pct};
-    return{txt:'✓ Até '+diasRestantes+unidade+' restantes (estim.)',cls:'sla-ok',pct};
+    const legenda=diasRestantes===1?' dia restante':' dias restantes';
+    if(rest<12)return{txt:'⚠ Até '+diasRestantes+legenda+' (estim.)',cls:'sla-warn',pct};
+    return{txt:'✓ Até '+diasRestantes+legenda+' (estim.)',cls:'sla-ok',pct};
   }
 
   function fmtDT(c){
