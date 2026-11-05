@@ -113,7 +113,7 @@ window.vSLA=async function(b,t,a,consId){
     if(!Array.isArray(rows))throw new Error('Configurações de SLA indisponíveis no banco.');
     if(t.textContent!=='Configuração de SLA'||!b.isConnected)return;
     rules=rows;
-    const canEdit=admin();
+    const canEdit=false; // Somente leitura: não existe RPC de SLA homologada para gravação.
     const row=(r,i)=>'<tr>'+
       '<td style="padding:8px"><input data-sla-campo="tipo" data-idx="'+i+'" value="'+esc(r.tipo_problema)+'" '+
         (canEdit?'':'disabled')+' style="min-width:160px"></td>'+
@@ -123,7 +123,7 @@ window.vSLA=async function(b,t,a,consId){
       '</tr>';
     b.innerHTML='<div class="card">'+escolha(selectedCons,'v19MudarConsSLA')+
       '<p style="font-size:11px;color:var(--gray-500);margin:14px 0">Prazos e alertas expressos em horas. '+
-      'A configuração é específica por consórcio e persiste no Supabase.</p>'+
+      'Regras consultadas no Supabase por consórcio. Edição bloqueada até existir RPC segura de gravação e homologação contratual.</p>'+
       '<div style="overflow:auto"><table><thead><tr><th>Tipo de problema</th>'+
       '<th>Urbano (h)</th><th>Alerta urbano (h)</th><th>Rural (h)</th>'+
       '<th>Alerta rural (h)</th></tr></thead><tbody id="v19-sla-linhas">'+
@@ -137,56 +137,10 @@ window.vSLA=async function(b,t,a,consId){
 };
 
 window.v19NovoSLA=function(){
-  if(!admin())return;
-  const idx=rules.length;
-  const linha={id:null,tipo_problema:'Nova ocorrência',urb_prazo:48,urb_alerta:12,rur_prazo:72,rur_alerta:24};
-  rules.push(linha);
-  const tbody=document.getElementById('v19-sla-linhas');
-  if(!tbody)return;
-  if(tbody.textContent.includes('Nenhuma regra'))tbody.innerHTML='';
-  const row='<tr><td><input data-sla-campo="tipo" data-idx="'+idx+'" value="Nova ocorrência"></td>'+
-    ['urb_prazo','urb_alerta','rur_prazo','rur_alerta'].map((k,i)=>
-      '<td><input type="number" min="1" max="8760" data-sla-campo="'+k+'" data-idx="'+idx+
-      '" style="width:80px" value="'+[48,12,72,24][i]+'"></td>').join('')+'</tr>';
-  tbody.insertAdjacentHTML('beforeend',row);
+  showToast('🔒 Edição de SLA desabilitada na V19: falta RPC de gravação homologada.','aviso');
 };
-
 window.v19SalvarSLA=async function(){
-  if(!admin()||!valid(selectedCons))return;
-  const btn=document.getElementById('v19-sla-salvar');
-  if(btn?.disabled)return;
-  const values=rules.map((r,i)=>{
-    const g=k=>document.querySelector('[data-idx="'+i+'"][data-sla-campo="'+k+'"]')?.value;
-    const q={consorcio_id:selectedCons,tipo_problema:(g('tipo')||'').trim(),updated_at:new Date().toISOString()};
-    ['urb_prazo','urb_alerta','rur_prazo','rur_alerta'].forEach(k=>q[k]=Number(g(k)));
-    if(r.id)q.id=r.id;
-    return q;
-  });
-  if(values.some(x=>!x.tipo_problema||Object.entries(x)
-     .some(([k,v])=>k.includes('_prazo')||k.includes('_alerta')
-        ? !Number.isInteger(v)||v<1||v>8760:false))){
-    showToast('Informe tipos de ocorrência e prazos válidos em horas.','erro');return;
-  }
-  const names=values.map(x=>x.tipo_problema.toLowerCase());
-  if(new Set(names).size!==names.length){showToast('Existem tipos de ocorrência duplicados.','erro');return;}
-  btn.disabled=true;btn.textContent='Salvando…';
-  let completed=0;
-  try{
-    for(let i=0;i<values.length;i++){
-      const r=values[i];
-      const updating=!!rules[i].id;
-      const url=updating?
-        'sla_configuracoes?id=eq.'+encodeURIComponent(r.id)+'&select=id':
-        'sla_configuracoes?select=id';
-      const resp=await sbFetch(url,updating?'PATCH':'POST',r);
-      if(!Array.isArray(resp)||resp.length!==1)
-        throw new Error('O banco não confirmou o prazo "'+r.tipo_problema+'".');
-      rules[i].id=resp[0].id;completed++;
-    }
-    showToast('✅ '+completed+' regras de SLA confirmadas no banco.','ok');
-  }catch(e){
-    showToast(esc(e.message)+' '+completed+' linha(s) salva(s); atualize a tela para conferir.','erro');
-  }finally{btn.disabled=false;btn.textContent='💾 Salvar prazos';}
+  showToast('🔒 Nenhum prazo foi salvo. A configuração de SLA está somente para consulta.','aviso');
 };
-console.info('[Aponte V19] Portal e SLA com persistência real disponíveis.');
+console.info('[Aponte V19] Configuração de SLA em modo somente leitura, sem gravação direta.');
 })();
