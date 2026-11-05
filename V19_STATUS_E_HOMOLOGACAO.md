@@ -293,3 +293,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - A captura posterior mostra 2/5 na tela, mas não permite comprovar sozinha novo F5; **persistência do Master após recarregamento ainda aguarda confirmação**.
 - Não houve alteração de prazos, como previsto no roteiro. Não interpretar esse teste como prova de isolamento negativo dos demais perfis.
 - Próxima ação: F5 no Master, abrir SLA e confirmar que 2/5 persistem; em seguida testar bloqueio para perfil sem direito de edição.
+
+## SLA — persistência Master confirmada após F5 (05/11/2026)
+
+- Operador respondeu "sim" após ser solicitado a pressionar F5 no login **Administrador Master** e verificar os prazos em **SLA**.
+- Confirmado por relato do operador: regra `PADRAO_GERAL` no Consórcio Alfa permaneceu **urbano 2 dias corridos** e **rural 5 dias corridos**, após salvar e recarregar.
+- **Aprovado: persistência Master após F5.** Em conjunto com a homologação anterior do Gestor Consórcio Alfa, os dois perfis privilegiados conseguiram gravar e persistir valores inalterados via interface.
+- Próximo teste único: login **Empresa Alfa B**, observar se o menu `SLA` é oferecido; captura de tela; não gravar. Isso é apenas teste visual de autorização, não substitui teste negativo de RPC com JWT de empresa.
