@@ -2645,16 +2645,18 @@ function gerarExcel(tipo){
         ws['!cols']=[{wch:22},{wch:18},{wch:18},{wch:14},{wch:12},{wch:24},{wch:18},{wch:6},{wch:16},{wch:14},{wch:10},{wch:10},{wch:18},{wch:14},{wch:6},{wch:6},{wch:8},{wch:12},{wch:12},{wch:18}];
       } else if(tipo==='sla'){
         nome='SLA';
-        const total=DB.chamados.length;
-        const conc=DB.chamados.filter(c=>c.status==='Concluído').length;
-        const atraso=DB.chamados.filter(c=>c.status==='Em atraso').length;
-        const pct=total?Math.round((conc/total)*100):0;
+        const validos=(_exportChamados||[]).map(c=>window.v19StatusSLA?.(c))
+          .filter(r=>r&&r.resultado!==null);
+        const total=(_exportChamados||[]).length;
+        const conc=validos.filter(r=>r.resultado===true).length;
+        const atraso=validos.length-conc;
+        const pct=validos.length?(100*conc/validos.length).toFixed(1)+'%':'Não apurável';
         // Resumo geral
         const resumo=[
           {'Indicador':'Total de chamados','Valor':total},
           {'Indicador':'Concluídos no prazo','Valor':conc},
           {'Indicador':'Em atraso','Valor':atraso},
-          {'Indicador':'Taxa de cumprimento SLA','Valor':pct+'%'},
+          {'Indicador':'Taxa de cumprimento SLA estimada','Valor':pct},
           {'Indicador':'Unidade de SLA','Valor':'Dias corridos (1 dia equivale a 24 horas)'},
         ];
         // Detalhe por chamado
