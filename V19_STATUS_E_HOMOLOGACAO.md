@@ -414,3 +414,13 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Correção de robustez preparada na branch `desenvolvimento-v19`**: agora `teste-v19/index.html` inicializa a função compartilhada `window.v19StatusSLA` na própria página antes da renderização, independente do arquivo auxiliar (commit `610d297bcfdcd0cbfe6f851faadf5d5fc2f09525`). O módulo `teste-v19/v19-relatorios.js` reaproveita essa mesma função (commit `6ae6b5abdbf01a9c5ece4750772209af71f5e0f2`).
 - Validada sintaxe JS dos dois arquivos e cinco cenários isolados de cálculo: urbano 48h, rural 120h, sem SLA, pausado, atrasado. **Ainda não verificado no Chrome do operador.**
 - Próxima tarefa única: baixar ZIP V19 atualizado, entrar Gestor Consórcio Alfa, abrir `Chamados`, pressionar F5 e conferir SLA do chamado **já criado**. Nenhum SQL adicional, nenhuma duplicação de chamado, nenhuma alteração no banco. V18/produção intactos.
+
+## SLA automático urbano na UI — aprovado com F5 e prazo restante (05/11/2026)
+
+- Operador enviou print em `Chamados`, logado como **Gestor Consórcio Alfa**, após baixar ZIP com correção do cálculo `window.v19StatusSLA`.
+- Primeiro chamado interno `V19I-B34E69091ABE419797D63A0D6BC0A0A2` com status **Recebido**, origem Interno e SLA destacado em verde **“✓ 1,99 dias restantes (estim.)”**.
+- Consulta SQL anterior confirmou `sla_horas=48`, área Urbana, `sla_pausado=false`, uma entrada em `chamado_historico`.
+- Lista mantém **9 chamados**, sem duplicação após F5; demais 8 sem SLA retroativo permanecem “SLA não apurável”, como previsto.
+- **APROVADO**: criação interna urbana, SLA automático no banco, apresentação em dias corridos e persistência após reload. 1,99 dias é saldo estimado desde a abertura, não erro de prazo.
+- Problema visual menor identificado no rótulo curto do protocolo gerado `V19I-` (renderização com prefixo adicional) — não afeta o UUID nem o valor armazenado; corrigir em revisão futura da UI, preservando protocolo integral no banco.
+- **Próximo teste:** criar apenas um novo chamado sintético **Rural** no Consórcio Alfa via mesma UI, confirmar 120 horas (5 dias) e 1 histórico no SQL; não alterar regras, não usar registros reais, evitar segundo clique.
