@@ -272,3 +272,9 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - **Aprovado: instalação/diagnóstico SQL59.** Não afirmar ainda que a edição por perfil autorizado no navegador ou aplicação automática de SLA a chamados novos foram testadas.
 - Próximo teste: obter o ZIP atualizado da branch `desenvolvimento-v19` e abrir `teste-v19/index.html` como **Gestor Consórcio Alfa**. Navegar até SLA e verificar regra geral **2 e 5 dias** e os controles para editar, sem gravar nesta primeira conferência. Pode exigir reinserir a chave `sb_publishable_` (somente no navegador) porque o cache usa `sessionStorage`.
 - Atenção: o SLA dos 8 chamados antigos permanece "não apurável" porque foram criados antes da regra, e a integração de atribuição automática futura ainda não foi instalada.
+
+## SLA — leitura e controles exibidos no navegador (05/11/2026)
+
+- Print recebido do operador logado como **Gestor Consórcio Alfa**, acessando a versão local atualizada `teste-v19/index.html` → menu **SLA**.
+- Na interface, consórcio **TESTE V19 - Consórcio Alfa** e regra `Padrão geral` exibem **urbano 2 dias corridos**, **rural 5 dias corridos**, alertas em branco (—), campos para edição e botão **Salvar prazos gerais** visíveis para esse perfil.
+- **Aprovado: exibição/leitura e disponibilidade de controles de edição**; captura não prova ainda gravação pela RPC. Teste seguinte: manter 2 e 5, clicar Salvar, aceitar confirmação, enviar resultado; depois recarregar com F5 para conferir persistência. NÃO alterar os prazos provisórios nesta etapa.
