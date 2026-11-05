@@ -391,3 +391,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - A branch `desenvolvimento-v19` contém frontend de abertura interna atualizado, commits `3bcefa438b89f15fd2c67874838075c7c68c7ae2` e `96306b2cc526fd48ca4e185a2dbfb8847a570fe8`: botão Novo chamado habilitado para perfis elegíveis, envio via RPC dedicada, UUID de cidade no seletor, protocolo/data/SLA devolvidos pelo Supabase, sem escrita de histórico cliente, geocodificação preservada e proteção contra duplo clique. Sintaxe dos scripts JS validada, **mas ainda não testados no navegador**.
 - **Não habilitado:** portal público, alteração administrativa genérica de chamados, foto, tratamento completo de idempotência em falha de rede, e demais fluxos que ainda requerem RPC. Não declarar a V19 pronta para produção.
 - Próximo passo único: operador executar uma vez SQL62 **somente no projeto Supabase V19 de homologação**, compartilhar as 8 verificações; depois baixar ZIP atualizado e criar **um** chamado urbano sintético na interface para testar gravação de 48h, histórico e F5. Não reutilizar V18/produção.
+
+## Interface — formulário interno abre para Gestor Consórcio Alfa (05/11/2026)
+
+- Operador enviou captura do `Novo chamado interno` logado como **Gestor Consórcio Alfa** após aplicação do SQL62 (8/8).
+- Formulário abre e mostra `Municipio Alfa 1`, área `Urbana`, tipo `Lâmpada apagada` (selecionado), quantidade `1` e `Sem atribuição` de empresa; campos de bairro, endereço, observações e GPS visíveis.
+- **Aprovado: renderização e abertura do formulário interno** para o gestor. Nenhum chamado novo confirmado ainda. O quadro de metadados de sessão apresenta `Organização —` apesar do perfil e responsável aparecerem corretos; pendência cosmética a conferir.
+- Operador orientado a criar **um único chamado sintético urbano** em Município Alfa 1, sem endereço/GPS/foto, com `Homologação V19` no bairro e observações claras de teste. Esperados: status Recebido, SLA 48h, histórico inicial atômico. Não repetir o clique em caso de erro; analisar a resposta antes de tentar novamente.
