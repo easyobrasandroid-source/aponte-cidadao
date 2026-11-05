@@ -307,3 +307,11 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Print posterior do usuário com login **Empresa Alfa B** no menu SLA mostra regra `PADRAO_GERAL` de Consórcio Alfa, valores 2/5, **sem campos de alteração e sem botão Salvar**. **Aprovado isolamento de edição na interface para perfil Empresa.**
 - Não inferir bloqueio backend apenas desse print; o `v19_salvar_sla_padrao` verifica os perfis no PostgreSQL, mas deve ser submetido a ensaio negativo com JWT real da empresa sem alterar dados.
 - Próximo teste visual sugerido: perfil **Técnico Garantia Alfa**, menu SLA, certificar controles de edição ausentes.
+
+## SLA — consulta sem edição pelo Técnico Garantia Alfa (05/11/2026)
+
+- Evidência: screenshot do operador autenticado como `Tecnico Garantia Alfa` exibindo `Configuração de SLA` do `TESTE V19 - Consorcio Alfa`.
+- Regra geral lida do banco: **2 dias corridos urbano, 5 dias corridos rural**. Alertas sem definição.
+- **Sem campos de edição e sem botão Salvar**: aprovado controle de interface para o perfil garantia.
+- Isto **não prova o bloqueio de uma chamada REST direta** por JWT deste perfil; o backend `v19_salvar_sla_padrao` tem restrição estática por `master`/`consorcio`, ainda sem teste negativo de execução com JWT real.
+- Testes positivos: gravação e persistência por Master e Gestor Consórcio Alfa confirmadas pelo operador. Testes negativos de interface: Empresa Alfa B e Técnico Garantia Alfa aprovados.
