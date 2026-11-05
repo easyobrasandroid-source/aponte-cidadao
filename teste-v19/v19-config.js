@@ -157,7 +157,14 @@ window.vSLA=async function(b,t,a,consId){
       '<th>Rural (dias)</th><th>Alerta rural (dias)</th>'+
       '</tr></thead><tbody id="v19-sla-linhas">'+
       (rules.length?rules.map(row).join(''):'<tr><td colspan="5">Nenhuma regra de SLA cadastrada.</td></tr>')+
-      '</tbody></table></div>'+edicao+'</div>';
+      '</tbody></table></div>'+edicao+
+      (CU?.perfil==='consorcio'&&CU.consorcio_id===selectedCons?
+        '<div style="border-top:1px solid #E5E7EB;padding-top:12px;margin-top:15px">'+
+        '<p style="font-size:12px;color:var(--gray-500)">Homologação de isolamento: o teste tenta editar o Consórcio Beta com valores inválidos (zero dias). Nenhum prazo pode ser alterado com esses valores.</p>'+
+        '<button class="btn btn-ghost" id="v19-sla-teste-consorcio" onclick="v19TestarIsolamentoConsorcio()">🔒 Testar bloqueio entre consórcios</button>'+
+        '<div id="v19-sla-resultado-consorcio" style="font-size:12px;margin-top:8px"></div>'+
+        '</div>':'')+
+      '</div>';
   }catch(e){
     b.innerHTML='<div class="card" style="color:var(--red)">'+esc(e.message)+'</div>';
   }
@@ -189,6 +196,39 @@ window.v19TestarBloqueioSLARPC=async function(){
       campo.textContent='⚠️ Não confirmado: o servidor retornou outro erro. Não interpretar como teste aprovado.';
       campo.style.color='var(--amber)';
       console.warn('[V19] Teste bloqueio SLA inconclusivo:',e);
+    }
+  }finally{
+    btn.disabled=false;
+  }
+};
+// Teste negativo isolado da homologação V19, sem modificar dados:
+// Gestor do Consórcio Alfa tenta passar o UUID do Consórcio Beta para a RPC.
+// Valores 0/0 são sempre inválidos. O backend deve barrar o consórcio
+// ANTES de validar os valores e antes de acessar qualquer regra.
+window.v19TestarIsolamentoConsorcio=async function(){
+  const betaId='9674d593-7d2b-44da-8d4d-97070bc95aca';
+  if(CU?.perfil!=='consorcio'||CU.consorcio_id!==selectedCons||
+     !valid(selectedCons)||selectedCons===betaId||slaSaving)return;
+  const btn=document.getElementById('v19-sla-teste-consorcio');
+  const field=document.getElementById('v19-sla-resultado-consorcio');
+  if(!btn||!field)return;
+  btn.disabled=true;
+  field.textContent='Verificando autorização entre consórcios no Supabase…';
+  try{
+    await sbFetch('rpc/v19_salvar_sla_padrao','POST',{
+      p_consorcio_id:betaId,p_urb_dias:0,p_rur_dias:0
+    });
+    field.textContent='❌ FALHA CRÍTICA: uma solicitação inválida foi aceita pelo servidor.';
+    field.style.color='var(--red)';
+  }catch(e){
+    const msg=String(e.corpo||'')+' '+String(e.message||'');
+    if(/CONSORCIO_NAO_AUTORIZADO/.test(msg)){
+      field.textContent='✅ APROVADO: o Supabase bloqueou a edição de outro consórcio.';
+      field.style.color='var(--green)';
+    }else{
+      field.textContent='⚠️ Teste inconclusivo: o servidor respondeu com outro erro. Não considerar aprovado.';
+      field.style.color='var(--amber)';
+      console.warn('[V19] Diagnóstico isolamento SLA inconclusivo:',e);
     }
   }finally{
     btn.disabled=false;
