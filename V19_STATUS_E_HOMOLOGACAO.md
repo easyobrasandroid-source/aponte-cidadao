@@ -437,3 +437,10 @@ O responsável pelo produto definiu **dias corridos, não dias úteis**, para os
 - Print do Gestor Consórcio Alfa após registrar o segundo chamado sintético interno: tabela exibe **10 chamados**, primeiro registro recente `Municipio Alfa 1`, bairro `Homologação V19 Rural`, tipo `Lâmpada piscando`, status `Recebido`, origem `Interno`, abertura 05/11/2026 13:53 (BRT).
 - **Criação e leitura do novo registro aprovadas visualmente**. A coluna SLA do novo rural exibe `SLA não apurável` embora a configuração Alfa tenha `rur_prazo=120` (5 dias corridos). O chamado urbano anterior permanece com `1,99 dias restantes`.
 - **Não aprovar ainda SLA rural**. Distinguir hipótese de erro de atribuição no banco vs erro de exibição na interface com SELECT de somente leitura por `consorcio.slug='teste-v19-alfa'`, `origem='Interno'`, `area='Rural'`, retornando `sla_horas`, prazo dias, data de abertura, pausa, histórico. Não criar outro chamado nem reexecutar migrations.
+
+## SLA rural — 120h e histórico único confirmados no banco (05/11/2026)
+
+- Consulta SQL somente leitura executada pelo operador para o chamado interno rural `V19I-7BAF895492A843AD898522E9EE4B8486`: `area=Rural`, `status=Recebido`, `sla_horas=120`, `prazo_dias=5`, `created_at=2026-11-05 16:53:47.22666+00`, `sla_pausado=false` e `eventos_historico=1`.
+- **Aprovados no banco:** inserção autenticada, atribuição automática SLA rural em dias corridos e registro único do histórico. O urbano anterior já foi confirmado com 48h e exibição correta após F5.
+- **Pendência de apresentação:** listagem mostrou "SLA não apurável" imediatamente após o cadastro rural. Não assumir falha de trigger ou de prazo no banco. Antes de diagnosticar outra causa, entrar na lista Chamados com o mesmo Gestor Alfa, pressionar F5 e verificar a linha rural (esperado próximo de 5 dias restantes). Sem novo SQL, novo chamado ou atualização ZIP durante este teste.
+- Solicitação de UX mantida: mostrar prazo remanescente em dias inteiros na próxima revisão, sem arredondar a comparação de vencimento.
