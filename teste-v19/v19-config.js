@@ -143,7 +143,11 @@ window.vSLA=async function(b,t,a,consId){
       '</div>'+
       '<button class="btn btn-save" id="v19-sla-salvar" onclick="v19SalvarSLA()">💾 Salvar prazos gerais</button>'+
       '</div>':
-      (!padrao?'<p style="font-size:12px;color:var(--amber);margin-top:14px">Regra geral ainda não cadastrada. Aplique e valide o SQL 59 exclusivamente na homologação V19.</p>':'');
+      (!padrao?'<p style="font-size:12px;color:var(--amber);margin-top:14px">Regra geral ainda não cadastrada. Aplique e valide o SQL 59 exclusivamente na homologação V19.</p>':'')+
+      (!admin()&&padrao?'<div style="border-top:1px solid #E5E7EB;margin-top:16px;padding-top:12px">'+
+      '<p style="font-size:12px;color:var(--gray-500)">Homologação V19: este diagnóstico envia valores inválidos (0 dias) para testar se a RPC rejeita seu perfil. Nenhuma regra pode ser salva com esses valores.</p>'+
+      '<button class="btn btn-ghost" id="v19-sla-teste-bloqueio" onclick="v19TestarBloqueioSLARPC()">🔒 Testar bloqueio de edição pelo banco</button>'+
+      '<div id="v19-sla-resultado-bloqueio" style="font-size:12px;margin-top:8px"></div></div>':'');
     b.innerHTML='<div class="card">'+escolha(selectedCons,'v19MudarConsSLA')+
       '<p style="font-size:12px;color:var(--gray-600);margin:14px 0">'+
       '<strong>SLA em dias corridos (24 horas por dia).</strong> Inclui finais de semana e feriados. '+
@@ -159,6 +163,37 @@ window.vSLA=async function(b,t,a,consId){
   }
 };
 
+// Homologação: teste negativo com entradas invariavelmente inválidas (0 dias).
+// A RPC valida perfil ANTES de validar prazos. Se perfil for bloqueado,
+// retorna PERFIL_NAO_AUTORIZADO. Mesmo que o controle de perfil falhasse,
+// 0 dias seriam barrados por PRAZO_EM_DIAS_INVALIDO antes de qualquer UPDATE.
+window.v19TestarBloqueioSLARPC=async function(){
+  if(admin()||!valid(selectedCons)||slaSaving)return;
+  const btn=document.getElementById('v19-sla-teste-bloqueio');
+  const campo=document.getElementById('v19-sla-resultado-bloqueio');
+  if(!btn||!campo)return;
+  btn.disabled=true;
+  campo.textContent='Verificando restrição no Supabase V19…';
+  try{
+    await sbFetch('rpc/v19_salvar_sla_padrao','POST',{
+      p_consorcio_id:selectedCons,p_urb_dias:0,p_rur_dias:0
+    });
+    campo.textContent='❌ FALHA CRÍTICA: chamada inválida aceita pelo servidor. Não prosseguir.';
+    campo.style.color='var(--red)';
+  }catch(e){
+    const detalhe=String(e.corpo||'')+' '+String(e.message||'');
+    if(/PERFIL_NAO_AUTORIZADO|CONSORCIO_NAO_AUTORIZADO/.test(detalhe)){
+      campo.textContent='✅ APROVADO: o Supabase recusou a RPC para este perfil.';
+      campo.style.color='var(--green)';
+    }else{
+      campo.textContent='⚠️ Não confirmado: o servidor retornou outro erro. Não interpretar como teste aprovado.';
+      campo.style.color='var(--amber)';
+      console.warn('[V19] Teste bloqueio SLA inconclusivo:',e);
+    }
+  }finally{
+    btn.disabled=false;
+  }
+};
 window.v19NovoSLA=function(){
   showToast('🔒 Inclusão de prazos específicos ainda não homologada; use apenas a regra geral.','aviso');
 };
