@@ -28,3 +28,20 @@
 - Validar convite/URL de redirecionamento permitida no Auth; verificar configuração de SMTP e templates.
 - Verificar em ambiente de homologação a Edge Function e os testes negativos com perfis reais.
 - Inspecionar e revisar patch; nenhum merge na `main` sem autorização.
+
+## Implementação em andamento (06/11/2026)
+
+- Código novo em `supabase/functions/v19-usuarios/index.ts` usando JWT de usuário, privilégio administrativo somente no servidor, convite oficial Supabase Auth e escopos tenant/perfil.
+- Tela `teste-v19/v19-usuarios.js` substitui ações locais por chamadas autenticadas à Edge Function e consulta listas reais no Supabase.
+- `teste-v19/index.html` inclui novo script apenas nesta branch; V18 e branch `main` não foram alteradas.
+- Workflow `.github/workflows/v19-usuarios-validacao.yml` adicionado para validar sintaxe, **sem deploy**.
+
+### Bloqueadores obrigatórios antes de implantar
+
+1. **Atomicidade de auditoria:** a primeira implementação atualiza `usuarios` e insere em `auditoria` por chamadas distintas. Se a segunda falhar, a operação pode persistir sem log transacional. Migrar para operação SQL atômica (RPC server-only) e adicionar testes; não publicar a implementação atual.
+2. **Testes da Edge Function:** validar tipagem com Deno e testes reais/negativos contra V19, incluindo escalonamento de perfis, seleção de empresa/cidade e concorrência.
+3. **Provisionamento Auth:** configurar convite, SMTP e redirecionamento na V19; não testar no banco V18.
+4. **Recuperação de falhas:** simular falha após convite/antes do vínculo sem apagar usuários Auth preexistentes e comprovar que não há conta ativa órfã.
+5. **Revogação de sessão:** usuário inativo deve ser rejeitado por todas as RPCs e interfaces, mesmo com JWT previamente válido; dados já carregados não são apagados remotamente.
+6. **Restrição de publicação:** GitHub branch e PR em rascunho não representam sistema homologado.
+
