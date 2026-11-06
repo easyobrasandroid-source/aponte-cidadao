@@ -94,6 +94,9 @@
       '<tbody id="v19-usr-linhas"></tbody></table></div>' +
       '<p style="font-size:12px;color:#64748b;margin-top:12px">O cadastro envia convite por e-mail; senhas não são cadastradas nesta tela. ' +
       'Excluir foi substituído por desativar, preservando os históricos.</p></div>';
+    const podeAlterar = (u) => CU?.perfil === "master" ||
+      (CU?.perfil === "consorcio" && u.consorcio_id === CU.consorcio_id &&
+       ["prefeitura", "empresa", "garantia"].includes(u.perfil));
     const desenhar = () => {
       const busca = (document.getElementById("v19-usr-busca")?.value || "").trim().toLocaleLowerCase("pt-BR");
       const p = document.getElementById("v19-usr-perfil-filtro")?.value || "";
@@ -111,7 +114,7 @@
           '<td style="padding:10px">' + esc(u.org || u.consorcio_id || "—") + '</td>' +
           '<td style="padding:10px">' + esc(u.status) + (u.auth_user_id ? "" : " · sem Auth") + '</td>' +
           '<td style="padding:10px;white-space:nowrap">' +
-            (u.id === CU?.id ? '<span style="color:#64748b">Conta atual</span>' :
+            (u.id === CU?.id ? '<span style="color:#64748b">Conta atual</span>' : !podeAlterar(u) ? '<span style="color:#64748b">Somente leitura</span>' :
               '<button type="button" class="btn btn-ghost" data-edit="' + esc(u.id) + '">Editar</button> ' +
               (u.perfil === "master" ? '<span style="color:#64748b">Protegido</span>' :
                 '<button type="button" class="btn btn-ghost" data-status="' + esc(u.id) + '">' +
