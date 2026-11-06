@@ -1,0 +1,4 @@
+# A execução de v19-usuarios depende obrigatoriamente de JWT de usuário.
+# Não desativar verify_jwt para contornar falhas de autenticação.
+[functions.v19-usuarios]
+verify_jwt = true
