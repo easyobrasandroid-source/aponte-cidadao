@@ -283,6 +283,14 @@
         esc(e.message) + ' <button class="btn btn-ghost" onclick="showView(\'usuarios\')">Tentar novamente</button></div>';
     }
   };
+  // Usuário desativado nunca poderá entrar pela interface, mesmo com JWT ainda válido.
+  const perfilOriginal = window.sbMeuPerfil;
+  if (typeof perfilOriginal === "function") {
+    window.sbMeuPerfil = async function () {
+      const perfil = await perfilOriginal();
+      return perfil && perfil.status === "ativo" ? perfil : null;
+    };
+  }
   // Remove a opção de menu indevida para Prefeitura. O bloqueio real permanece no servidor.
   const setupOriginal = window.setupUI;
   if (typeof setupOriginal === "function") {
