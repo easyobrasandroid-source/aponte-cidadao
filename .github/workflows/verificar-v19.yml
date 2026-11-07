@@ -1,0 +1,22 @@
+name: "V19 · verificação estática"
+on:
+  push:
+    branches: [desenvolvimento-v19]
+  pull_request:
+    paths:
+      - 'teste-v19/**'
+      - 'teste-v18/**'
+      - 'sql/v19/**'
+      - 'scripts/verificar-v19.mjs'
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar JavaScript e estrutura
+        run: node scripts/verificar-v19.mjs
