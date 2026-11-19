@@ -1,0 +1,350 @@
+/* APONTE CIDADAO V19 — ETAPA 583
+ * Consumo REAL por chamado, somente pela EMPRESA responsavel.
+ * A funcao v19_consumir_material_chamado_empresa executa baixa
+ * transacional, historico e auditoria no banco (etapa 575).
+ * Master/Consorcio: somente consulta. Edicao/estorno reais no modulo v19-chamado-ajustes.js.
+ * Operacao exige confirmacao, valida retorno e impede reenvio ambiguo.
+ * V18 de producao permanece intacta.
+ */
+(function () {
+  'use strict';
+  const uuid=v=>typeof v==='string' &&
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
+  const dec=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const money=v=>Number(v||0).toLocaleString('pt-BR',
+    {style:'currency',currency:'BRL'});
+  const readStatuses=new Set([
+    'Em programação','Em execução','Aguard. material','Aguardando material'
+  ]);
+  let renderId=0;
+  let modalId=0;
+
+  function node(tag,parent,content,style) {
+    const el=document.createElement(tag);
+    if(content!==undefined && content!==null)el.textContent=String(content);
+    if(style)el.style.cssText=style;
+    if(parent)parent.appendChild(el);
+    return el;
+  }
+  function message(text) {
+    if(typeof showToast==='function')showToast(text,'aviso');
+  }
+  function canPreview(ch) {
+    return !!SB_SESSION?.user?.id &&
+      CU?.perfil==='empresa' &&
+      uuid(CU?.consorcio_id) && uuid(CU?.empresa_id) &&
+      ch?.consorcio_id===CU.consorcio_id &&
+      ch?.empresa_id===CU.empresa_id &&
+      uuid(ch?._supaId);
+  }
+  function activeSession(user,company,callId) {
+    return SB_SESSION?.user?.id===user &&
+      CU?.perfil==='empresa' && CU?.empresa_id===company &&
+      CC?._supaId===callId;
+  }
+  function addMessage(parent,heading,text) {
+    const wrap=node('section',parent,null,
+      'border:1px solid #e2e8f0;border-radius:10px;' +
+      'padding:12px;margin-top:12px;background:#fff;');
+    node('strong',wrap,heading,'font-size:13px;color:#0f172a;');
+    if(text)node('p',wrap,text,
+      'font-size:12px;color:#64748b;margin:6px 0 0;');
+    return wrap;
+  }
+  function closeModal() {
+    const modal=document.getElementById('v19-consumo-preview');
+    if(modal)modal.remove();
+    document.body.style.overflow='';
+  }
+  window.v19FecharPreviewConsumo=closeModal;
+
+  window.adicionarMaterialChamado=async function() {
+    const ch=CC;
+    if(!canPreview(ch)) {
+      message('Somente a empresa responsável pode consultar materiais para este chamado.');
+      return;
+    }
+    const session=SB_SESSION.user.id;
+    const company=CU.empresa_id;
+    const consortium=CU.consorcio_id;
+    const callId=ch._supaId;
+    const request=++modalId;
+    closeModal();
+    const shade=node('div',document.body,null,
+      'position:fixed;inset:0;background:rgba(15,23,42,.60);' +
+      'z-index:10000;display:flex;justify-content:center;align-items:center;' +
+      'padding:16px;box-sizing:border-box;');
+    shade.id='v19-consumo-preview';
+    const card=node('div',shade,null,
+      'background:#fff;border-radius:14px;max-width:650px;width:100%;' +
+      'max-height:88vh;overflow:auto;padding:18px;box-sizing:border-box;');
+    const header=node('div',card,null,
+      'display:flex;justify-content:space-between;align-items:center;gap:12px;');
+    node('strong',header,'Materiais da minha empresa · Chamado',
+      'font-size:16px;color:#0f172a;');
+    const close=node('button',header,'Fechar',
+      'border:1px solid #cbd5e1;background:white;border-radius:8px;' +
+      'padding:8px 12px;cursor:pointer;');
+    close.type='button';close.addEventListener('click',closeModal);
+    shade.addEventListener('click',e=>{if(e.target===shade)closeModal();});
+    addMessage(card,'Registrar consumo de material',
+      'A empresa responsável pode dar baixa real no estoque do chamado.' +
+      ' Confirme a operação antes de gravar.' +
+      ' Para editar ou estornar consumos já registrados, use a aba Materiais.');
+    const results=node('div',card,'Consultando saldo empresarial…',
+      'font-size:12px;color:#64748b;margin-top:12px;');
+    document.body.style.overflow='hidden';
+    try {
+      const [called,stocks]=await Promise.all([
+        sbSelect('chamados','select=id,consorcio_id,empresa_id,status,protocolo'+
+          '&id=eq.'+encodeURIComponent(callId)+'&limit=1'),
+        sbFetch('rpc/v19_listar_estoques_por_empresa',
+          'POST',{p_consorcio_id:consortium})
+      ]);
+      if(request!==modalId || !activeSession(session,company,callId) ||
+         !document.getElementById('v19-consumo-preview'))return;
+      if(!Array.isArray(called)||called.length!==1 ||
+        called[0].empresa_id!==company ||
+        called[0].consorcio_id!==consortium) {
+        throw new Error('O chamado não está atribuído à sua empresa.');
+      }
+      const status=String(called[0].status||'');
+      if(!Array.isArray(stocks))throw new Error('Consulta de estoque indisponível.');
+      // Defesa adicional: falha fechada se a RPC devolver saldos de terceiros.
+      if(stocks.some(r=>r?.empresa_id!==company ||
+          r?.consorcio_id!==consortium || r?.saldo_legado===true)) {
+        throw new Error('Consulta retornou estoque de outra empresa.');
+      }
+      results.replaceChildren();
+      addMessage(results,'Chamado '+(called[0].protocolo||''),
+        readStatuses.has(status)
+          ? 'Status '+status+' · baixa de materiais permitida à empresa responsável.'
+          : 'Status '+status+' · consumo não é permitido neste estado.');
+      const list=stocks.filter(r=>r.estoque_id && uuid(r.estoque_id));
+      if(!list.length){
+        addMessage(results,'Nenhum material cadastrado',
+          'Cadastre materiais na tela Estoque da própria empresa.');
+        return;
+      }
+      list.sort((a,b)=>String(a.material_nome).localeCompare(String(b.material_nome),'pt-BR'))
+        .forEach(r=>{
+          const available=Number(r.quantidade_disponivel);
+          const pane=addMessage(results,String(r.material_nome||'Material'),
+            'Disponível: '+dec(r.quantidade_disponivel)+' '+(r.unidade||'')+
+            ' · Contratado: '+dec(r.quantidade_contratada)+
+            ' · Preço unitário: '+money(r.preco_unitario));
+          const allowed=readStatuses.has(status) &&
+            uuid(r.material_id) && Number.isFinite(available) &&
+            available>0 && available<=Number(r.quantidade_contratada);
+          node('small',pane,
+            allowed
+              ? 'Consumo permitido neste chamado, sujeito à confirmação e ao saldo atual'
+              : available<=0 ? 'Sem saldo disponível para consumo'
+                : 'Consumo indisponível neste status ou registro',
+            'display:block;margin-top:6px;color:#64748b;');
+          if(!allowed)return;
+          const form=node('form',pane,null,
+            'display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin-top:12px;');
+          const label=node('label',form,null,
+            'font-size:12px;color:#334155;font-weight:600;display:flex;' +
+            'flex-direction:column;gap:4px;');
+          node('span',label,'Quantidade a consumir');
+          const amount=node('input',label,null,
+            'border:1px solid #cbd5e1;border-radius:8px;' +
+            'padding:9px;width:130px;box-sizing:border-box;');
+          amount.type='number';amount.min='0.01';amount.max=String(available);
+          amount.step='0.01';amount.value=String(Math.min(1,available));
+          const simulate=node('button',form,'Registrar consumo',
+            'background:#0f766e;color:#fff;border:0;border-radius:8px;' +
+            'padding:10px 12px;font-weight:700;cursor:pointer;');
+          simulate.type='submit';
+          const preview=node('div',pane,null,
+            'font-size:12px;color:#334155;margin-top:10px;');
+          form.addEventListener('submit',async event=>{
+            event.preventDefault();
+            // Importante: apos qualquer POST, sucesso ou erro ambiguo,
+            // nao apagar mensagem e NUNCA permitir um segundo envio.
+            if(shade.dataset.consumoEnviado==='1')return;
+            if(request!==modalId || !activeSession(session,company,callId) ||
+               !document.getElementById('v19-consumo-preview'))return;
+            preview.replaceChildren();
+            const qtyNum=Number(amount.value);
+            if(amount.value==='' || !Number.isFinite(qtyNum) ||
+               qtyNum<=0 || qtyNum>available ||
+               qtyNum>9999999999 ||
+               Math.abs(Math.round(qtyNum*100)/100-qtyNum)>1e-9) {
+              node('strong',preview,
+                'Quantidade inválida ou acima do saldo da empresa.',
+                'color:#b91c1c;');
+              return;
+            }
+            const unit=String(r.unidade||'Un.');
+            const name=String(r.material_nome||'Material');
+            // A confirmacao e a ultima barreira antes do POST real.
+            // A RPC validara novamente o usuario, chamado, status,
+            // titularidade e saldo sob lock transacional.
+            if(shade.dataset.consumoEnviado==='1')return;
+            const cost=qtyNum*Number(r.preco_unitario||0);
+            const confirmed=window.confirm(
+              'REGISTRAR CONSUMO REAL NA V19?'+
+              '\nEmpresa: '+String(r.empresa_nome||'')+
+              '\nChamado: '+String(called[0].protocolo||callId)+
+              '\nMaterial: '+name+
+              '\nQuantidade: '+dec(qtyNum)+' '+unit+
+              '\nSaldo exibido: '+dec(available)+' '+unit+
+              '\nSaldo previsto: '+dec(Math.round((available-qtyNum)*100)/100)+
+              '\nCusto estimado: '+money(cost)+
+              '\nA baixa, historico e auditoria serao GRAVADOS no Supabase V19.'
+            );
+            if(!confirmed)return;
+            if(request!==modalId || !activeSession(session,company,callId) ||
+               !document.getElementById('v19-consumo-preview') ||
+               shade.dataset.consumoEnviado==='1')return;
+            shade.dataset.consumoEnviado='1';
+            // Trava TODOS os formularios desta janela para evitar
+            // consumo duplicado enquanto uma baixa esta em andamento.
+            Array.from(card.querySelectorAll('form button, form input'))
+              .forEach(el=>{el.disabled=true;});
+            addMessage(preview,'Registrando consumo',
+              'Aguardando confirmacao transacional do Supabase V19…');
+            // Mantem chave da operacao sem confirmacao entre recargas nesta aba.
+            const chavePendente='v19-consumo-pendente-'+session+'-'+callId+'-'+r.material_id;
+            try {
+              const dados={
+                p_chamado_id:callId,
+                p_material_id:r.material_id,
+                p_quantidade:qtyNum
+              };
+              const assinatura=JSON.stringify(dados);
+              const anterior=JSON.parse(sessionStorage.getItem(chavePendente)||'null');
+              if(anterior && anterior.assinatura!==assinatura)
+                throw new Error('Consumo anterior deste material sem confirmação. Confira o histórico antes de registrar outra quantidade.');
+              const chave=anterior?.id || window.crypto?.randomUUID?.();
+              if(!chave)throw new Error('Navegador sem gerador seguro de ID de requisição.');
+              if(!anterior)sessionStorage.setItem(chavePendente,
+                JSON.stringify({id:chave,assinatura}));
+              const response=await sbFetch(
+                'rpc/v19_consumir_material_chamado_idempotente','POST',{
+                  p_requisicao_id:chave,
+                  ...dados
+                }
+              );
+              const before=Number(response?.saldo_anterior);
+              const after=Number(response?.novo_saldo);
+              const responseQty=Number(response?.quantidade);
+              const total=Number(response?.total);
+              const validResponse=response?.ok===true &&
+                uuid(response?.item_id) &&
+                response.empresa_id===company &&
+                response.material_id===r.material_id &&
+                response.estoque_id===r.estoque_id &&
+                responseQty===qtyNum &&
+                Number.isFinite(before) && Number.isFinite(after) &&
+                Number.isFinite(total) && total>=0 &&
+                before>=qtyNum && after>=0 &&
+                Math.abs(before-qtyNum-after)<=1e-9;
+              if(!validResponse){
+                throw new Error('Resposta da baixa inconsistente. Confira o estoque e o chamado.');
+              }
+              sessionStorage.removeItem(chavePendente);
+              if(request!==modalId || !activeSession(session,company,callId) ||
+                 !document.getElementById('v19-consumo-preview'))return;
+              results.replaceChildren();
+              addMessage(results,'Consumo REGISTRADO com sucesso',
+                'Empresa: '+String(r.empresa_nome||'')+
+                ' · Chamado: '+String(called[0].protocolo||callId)+
+                ' · Material: '+name+
+                ' · Quantidade consumida: '+dec(qtyNum)+' '+unit+
+                ' · Saldo anterior confirmado: '+dec(before)+
+                ' · Novo saldo confirmado: '+dec(after)+
+                ' · Valor registrado: '+money(response.total)+
+                ' · Registro: '+String(response.item_id));
+              node('p',results,
+                'A operação foi gravada no Supabase. Feche esta janela' +
+                ' para conferir o material na aba Materiais do chamado.',
+                'font-size:12px;color:#047857;margin-top:10px;font-weight:600;');
+              // Sincronizar lista do chamado, nunca repetir o POST.
+              if(typeof window.renderMateriaisChamado==='function'){
+                Promise.resolve(window.renderMateriaisChamado()).catch(e=>{
+                  console.warn('[V19 consumo] falha ao atualizar lista',e);
+                });
+              }
+            }catch(e){
+              // Erro HTTP definitivo: a RPC rejeitou sem gravar.
+              // Falha de rede / resposta incerta: preservar o mesmo ID.
+              if([400,401,403,409,422].includes(e?.status))
+                sessionStorage.removeItem(chavePendente);
+              if(request!==modalId || !activeSession(session,company,callId) ||
+                 !document.getElementById('v19-consumo-preview'))return;
+              preview.replaceChildren();
+              addMessage(preview,'Consumo sem confirmação — NÃO REPETIR',
+                'A resposta não confirmou a operação: '+
+                (e?.message||'Falha de comunicação.')+
+                ' Uma falha de rede pode acontecer APÓS a gravação.'+
+                ' Feche a janela, atualize o estoque e consulte o chamado' +
+                ' antes de tentar qualquer nova baixa.');
+              // Reenvio neste modal fica definitivamente desabilitado.
+            }
+          });
+        });
+    } catch(e) {
+      if(request!==modalId || !activeSession(session,company,callId) ||
+         !document.getElementById('v19-consumo-preview'))return;
+      results.replaceChildren();
+      addMessage(results,'Não foi possível consultar materiais',
+        e?.message||'Erro de conexão. Tente novamente.');
+    }
+  };
+
+  window.renderMateriaisChamado=async function() {
+    const target=document.getElementById('dw-materiais-lista');
+    if(!target||!CC)return;
+    const current=++renderId;
+    const user=SB_SESSION?.user?.id;
+    const called=CC;
+    target.replaceChildren();
+    node('p',target,'Carregando consumo registrado…',
+      'font-size:12px;color:#64748b;');
+    if(!uuid(called._supaId)||!user) {
+      target.replaceChildren();
+      addMessage(target,'Dados indisponíveis',
+        'Identificação do chamado ou sessão indisponível.');
+      return;
+    }
+    try {
+      const [items,mats]=await Promise.all([
+        sbSelect('chamado_materiais','select=id,material_id,quantidade,preco_unitario,total,estoque_id'+
+          '&chamado_id=eq.'+encodeURIComponent(called._supaId)),
+        sbSelect('materiais','select=id,nome&consorcio_id=eq.'+encodeURIComponent(called.consorcio_id))
+      ]);
+      if(current!==renderId || SB_SESSION?.user?.id!==user ||
+         CC?._supaId!==called._supaId || !document.getElementById('dw-materiais-lista'))return;
+      target.replaceChildren();
+      if(!Array.isArray(items)||!Array.isArray(mats))throw new Error('Leitura negada pelo Supabase.');
+      if(!items.length){
+        addMessage(target,'Nenhum material consumido',null);
+        return;
+      }
+      const names=new Map(mats.map(m=>[m.id,m.nome]));
+      items.forEach(item=>{
+        addMessage(target,names.get(item.material_id)||'Material',
+          'Quantidade: '+dec(item.quantidade)+' · Valor: '+money(item.total)+
+          ' · Registro vinculado ao estoque de origem');
+      });
+      addMessage(target,'Ajustes do consumo',
+        'Edição e estorno são restritos à empresa que realizou o consumo.');
+    } catch(e) {
+      if(current!==renderId)return;
+      target.replaceChildren();
+      addMessage(target,'Não foi possível carregar os consumos',
+        e?.message||'Erro de conexão.');
+    }
+  };
+
+  // Manter INATIVAS as rotas legadas de edicao/estorno/confirmacao:
+  // nunca permitir gravar pelas RPCs antigas ainda referenciadas no HTML.
+  window.editarMaterialChamado=()=>message('Acesse as ações de materiais do chamado para editar um consumo autorizado.');
+  window.removerMaterialChamado=()=>message('Acesse as ações de materiais do chamado para estornar um consumo autorizado.');
+  window.confirmarMatChamado=()=>message('Registre o consumo pelo formulário empresarial do chamado.');
+  window.abrirModalMaterialChamado=()=>message('Registre o consumo pela opção Materiais deste chamado.');
+})();
